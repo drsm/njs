@@ -2096,6 +2096,25 @@ njs_dump_value(njs_json_stringify_t *stringify, const njs_value_t *value)
         njs_string_get(value, &str);
         return njs_json_append_string(stringify, value, '\'');
 
+    case NJS_OBJECT_SYMBOL:
+        //value = &value->data.u.object_value->value;
+
+        //ret = njs_number_to_string(stringify->vm, &str_val, value);
+        //if (nxt_slow_path(ret != NXT_OK)) {
+        //    return NXT_ERROR;
+        //}
+
+        //njs_string_get(&str_val, &str);
+
+        njs_dump("[Symbol: Symbol()]");
+        //njs_json_buf_append(stringify, (char *) str.start, str.length);
+        //njs_dump("]")
+        break;
+
+    case NJS_SYMBOL:
+        njs_dump("Symbol()");
+        break;
+
     case NJS_OBJECT_NUMBER:
         value = &value->data.u.object_value->value;
 

@@ -281,6 +281,7 @@ njs_property_query(njs_vm_t *vm, njs_property_query_t *pq, njs_value_t *object,
 
     case NJS_BOOLEAN:
     case NJS_NUMBER:
+    case NJS_SYMBOL:
         index = njs_primitive_prototype_index(object->type);
         obj = &vm->prototypes[index].object;
         break;
@@ -330,6 +331,7 @@ njs_property_query(njs_vm_t *vm, njs_property_query_t *pq, njs_value_t *object,
     case NJS_OBJECT:
     case NJS_OBJECT_BOOLEAN:
     case NJS_OBJECT_NUMBER:
+    case NJS_OBJECT_SYMBOL:
     case NJS_REGEXP:
     case NJS_DATE:
     case NJS_OBJECT_ERROR:
@@ -2340,6 +2342,8 @@ static const njs_value_t  njs_object_boolean_string =
                                      njs_long_string("[object Boolean]");
 static const njs_value_t  njs_object_number_string =
                                      njs_long_string("[object Number]");
+static const njs_value_t  njs_object_symbol_string =
+                                     njs_long_string("[object Symbol]");
 static const njs_value_t  njs_object_string_string =
                                      njs_long_string("[object String]");
 static const njs_value_t  njs_object_data_string =
@@ -2371,11 +2375,11 @@ njs_object_prototype_to_string(njs_vm_t *vm, njs_value_t *args,
         &njs_object_undefined_string,
         &njs_object_boolean_string,
         &njs_object_number_string,
+        &njs_object_symbol_string,
         &njs_object_string_string,
 
         &njs_object_data_string,
         &njs_object_exernal_string,
-        NULL,
         NULL,
         NULL,
         NULL,
@@ -2390,6 +2394,7 @@ njs_object_prototype_to_string(njs_vm_t *vm, njs_value_t *args,
         &njs_object_array_string,
         &njs_object_boolean_string,
         &njs_object_number_string,
+        &njs_object_symbol_string,
         &njs_object_string_string,
         &njs_object_function_string,
         &njs_object_regexp_string,

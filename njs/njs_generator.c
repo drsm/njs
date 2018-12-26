@@ -352,6 +352,7 @@ njs_generator(njs_vm_t *vm, njs_generator_t *generator, njs_parser_node_t *node)
     case NJS_TOKEN_ARRAY_CONSTRUCTOR:
     case NJS_TOKEN_NUMBER_CONSTRUCTOR:
     case NJS_TOKEN_BOOLEAN_CONSTRUCTOR:
+    case NJS_TOKEN_SYMBOL_CONSTRUCTOR:
     case NJS_TOKEN_STRING_CONSTRUCTOR:
     case NJS_TOKEN_FUNCTION_CONSTRUCTOR:
     case NJS_TOKEN_REGEXP_CONSTRUCTOR:

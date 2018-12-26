@@ -64,6 +64,7 @@ static const njs_keyword_t  njs_keywords[] = {
     { nxt_string("Array"),         NJS_TOKEN_ARRAY_CONSTRUCTOR, 0 },
     { nxt_string("Boolean"),       NJS_TOKEN_BOOLEAN_CONSTRUCTOR, 0 },
     { nxt_string("Number"),        NJS_TOKEN_NUMBER_CONSTRUCTOR, 0 },
+    { nxt_string("Symbol"),        NJS_TOKEN_SYMBOL_CONSTRUCTOR, 0 },
     { nxt_string("String"),        NJS_TOKEN_STRING_CONSTRUCTOR, 0 },
     { nxt_string("Function"),      NJS_TOKEN_FUNCTION_CONSTRUCTOR, 0 },
     { nxt_string("RegExp"),        NJS_TOKEN_REGEXP_CONSTRUCTOR, 0 },

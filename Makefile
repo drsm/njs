@@ -11,6 +11,7 @@ $(NXT_BUILDDIR)/libnjs.a: \
 	$(NXT_BUILDDIR)/njs_vm.o \
 	$(NXT_BUILDDIR)/njs_boolean.o \
 	$(NXT_BUILDDIR)/njs_number.o \
+	$(NXT_BUILDDIR)/njs_symbol.o \
 	$(NXT_BUILDDIR)/njs_string.o \
 	$(NXT_BUILDDIR)/njs_object.o \
 	$(NXT_BUILDDIR)/njs_array.o \
@@ -57,6 +58,7 @@ $(NXT_BUILDDIR)/libnjs.a: \
 		$(NXT_BUILDDIR)/njs_vm.o \
 		$(NXT_BUILDDIR)/njs_boolean.o \
 		$(NXT_BUILDDIR)/njs_number.o \
+		$(NXT_BUILDDIR)/njs_symbol.o \
 		$(NXT_BUILDDIR)/njs_string.o \
 		$(NXT_BUILDDIR)/njs_object.o \
 		$(NXT_BUILDDIR)/njs_array.o \
@@ -137,6 +139,7 @@ $(NXT_BUILDDIR)/njs_shell.o: \
 	njs/njs.h \
 	njs/njs_core.h \
 	njs/njs_vm.h \
+	njs/njs_symbol.h \
 	njs/njs_string.h \
 	njs/njs_object.h \
 	njs/njs_function.h \
@@ -155,6 +158,7 @@ $(NXT_BUILDDIR)/njs_vm.o: \
 	njs/njs_core.h \
 	njs/njs_vm.h \
 	njs/njs_number.h \
+	njs/njs_symbol.h \
 	njs/njs_string.h \
 	njs/njs_object.h \
 	njs/njs_object_hash.h \
@@ -198,6 +202,25 @@ $(NXT_BUILDDIR)/njs_number.o: \
 	$(NXT_CC) -c -o $(NXT_BUILDDIR)/njs_number.o $(NXT_CFLAGS) \
 		-I$(NXT_LIB) -Injs \
 		njs/njs_number.c
+
+$(NXT_BUILDDIR)/njs_symbol.o: \
+	$(NXT_BUILDDIR)/libnxt.a \
+	njs/njs.h \
+	njs/njs_core.h \
+	njs/njs_vm.h \
+	njs/njs_number.h \
+	njs/njs_symbol.h \
+	njs/njs_string.h \
+	njs/njs_object.h \
+	njs/njs_object_hash.h \
+	njs/njs_array.h \
+	njs/njs_function.h \
+	njs/njs_parser.h \
+	njs/njs_symbol.c \
+
+	$(NXT_CC) -c -o $(NXT_BUILDDIR)/njs_symbol.o $(NXT_CFLAGS) \
+		-I$(NXT_LIB) -Injs $(NXT_PCRE_CFLAGS) \
+		njs/njs_symbol.c
 
 $(NXT_BUILDDIR)/njs_string.o: \
 	$(NXT_BUILDDIR)/libnxt.a \

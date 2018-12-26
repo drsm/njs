@@ -56,6 +56,7 @@ const njs_object_init_t  *njs_prototype_init[] = {
     &njs_array_prototype_init,
     &njs_boolean_prototype_init,
     &njs_number_prototype_init,
+    &njs_symbol_prototype_init,
     &njs_string_prototype_init,
     &njs_function_prototype_init,
     &njs_regexp_prototype_init,
@@ -79,6 +80,7 @@ const njs_object_init_t    *njs_constructor_init[] = {
     &njs_array_constructor_init,
     &njs_boolean_constructor_init,
     &njs_number_constructor_init,
+    &njs_symbol_constructor_init,
     &njs_string_constructor_init,
     &njs_function_constructor_init,
     &njs_regexp_constructor_init,
@@ -158,6 +160,7 @@ const njs_function_init_t  njs_native_constructors[] = {
     { njs_array_constructor,      { 0 } },
     { njs_boolean_constructor,    { 0 } },
     { njs_number_constructor,     { NJS_SKIP_ARG, NJS_NUMBER_ARG } },
+    { njs_symbol_constructor,     { NJS_SKIP_ARG, NJS_STRING_ARG } },
     { njs_string_constructor,     { NJS_SKIP_ARG, NJS_STRING_ARG } },
     { njs_function_constructor,   { 0 } },
     { njs_regexp_constructor,
@@ -197,6 +200,9 @@ const njs_object_prototype_t  njs_prototype_values[] = {
 
     { .object_value = { .value = njs_value(NJS_NUMBER, 0, 0.0),
                         .object = { .type = NJS_OBJECT_NUMBER } } },
+
+    { .object_value = { .value = njs_value(NJS_SYMBOL, 1, NAN),
+                        .object = { .type = NJS_OBJECT_SYMBOL } } },
 
     { .object_value = { .value = njs_string(""),
                         .object = { .type = NJS_OBJECT_STRING } } },

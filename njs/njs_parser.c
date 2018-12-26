@@ -1994,6 +1994,10 @@ njs_parser_terminal(njs_vm_t *vm, njs_parser_t *parser, njs_token_t token)
         node->index = NJS_INDEX_NUMBER;
         break;
 
+    case NJS_TOKEN_SYMBOL_CONSTRUCTOR:
+        node->index = NJS_INDEX_SYMBOL;
+        break;
+
     case NJS_TOKEN_STRING_CONSTRUCTOR:
         node->index = NJS_INDEX_STRING;
         break;

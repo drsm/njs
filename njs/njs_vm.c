@@ -92,6 +92,8 @@ const njs_value_t  njs_string_minus_infinity =
 const njs_value_t  njs_string_plus_infinity =
                                             njs_string("Infinity");
 const njs_value_t  njs_string_nan =         njs_string("NaN");
+const njs_value_t  njs_string_symbol =      njs_string("symbol");
+const njs_value_t  njs_string_symbol_string =      njs_string("Symbol()");
 const njs_value_t  njs_string_string =      njs_string("string");
 const njs_value_t  njs_string_object =      njs_string("object");
 const njs_value_t  njs_string_function =    njs_string("function");
@@ -1029,6 +1031,7 @@ njs_vmcode_typeof(njs_vm_t *vm, njs_value_t *value, njs_value_t *invld)
         &njs_string_void,
         &njs_string_boolean,
         &njs_string_number,
+        &njs_string_symbol,
         &njs_string_string,
         &njs_string_void,
         &njs_string_void,
@@ -1040,8 +1043,8 @@ njs_vmcode_typeof(njs_vm_t *vm, njs_value_t *value, njs_value_t *invld)
         &njs_string_void,
         &njs_string_void,
         &njs_string_void,
-        &njs_string_void,
 
+        &njs_string_object,
         &njs_string_object,
         &njs_string_object,
         &njs_string_object,
@@ -2256,6 +2259,9 @@ njs_type_string(njs_value_type_t type)
     case NJS_NUMBER:
         return "number";
 
+    case NJS_SYMBOL:
+        return "symbol";
+
     case NJS_STRING:
         return "string";
 
@@ -2276,6 +2282,9 @@ njs_type_string(njs_value_type_t type)
 
     case NJS_OBJECT_NUMBER:
         return "object number";
+
+    case NJS_OBJECT_SYMBOL:
+        return "object symbol";
 
     case NJS_OBJECT_STRING:
         return "object string";
