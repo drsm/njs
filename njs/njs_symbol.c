@@ -11,33 +11,30 @@ njs_ret_t
 njs_symbol_constructor(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     njs_index_t unused)
 {
-    //njs_object_t       *object;
-    //const njs_value_t  *value;
-
-    //if (nargs == 1) {
-    //     value = &njs_string_empty;
-
-    // } else {
-    //     value = &args[1];
-    // }
+    // TODO: dummy implementation
+    njs_value_t  *value;
 
     if (vm->top_frame->ctor) {
-        njs_type_error(vm, "Symbol is not a constructor");
-        return NXT_ERROR;
-        /*
-        object = njs_object_value_alloc(vm, value, value->type);
-        if (nxt_slow_path(object == NULL)) {
-            return NXT_ERROR;
-        }
 
-        vm->retval.data.u.object = object;
-        vm->retval.type = NJS_OBJECT_SYMBOL;
-        vm->retval.data.truth = 1;
-        */
-    } else {
-        vm->retval.type = NJS_SYMBOL;
-        vm->retval.data.truth = 1;
+        njs_type_error(vm, "Symbol is not a constructor");
+
+        return NXT_ERROR;
     }
+
+    if (nargs == 1) {
+        value = &vm->retval;
+
+        value->short_string.size = 0;
+        value->short_string.length = 0;
+
+    } else {
+        value = &args[1];
+        vm->retval = *value;
+    }
+
+    // XXX
+    //vm->retval.data.truth = 1;
+    vm->retval.type = NJS_SYMBOL;
 
     return NXT_OK;
 }
@@ -101,102 +98,53 @@ njs_symbol_prototype_value_of(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 }
 
 
-/*
- * String.toString([encoding]).
- * Returns the string as is if no additional argument is provided,
- * otherwise converts a byte string into an encoded string: hex, base64,
- * base64url.
- */
-
 static njs_ret_t
 njs_symbol_prototype_to_string(njs_vm_t *vm, njs_value_t *args,
     nxt_uint_t nargs, njs_index_t unused)
 {
-    nxt_int_t          ret;
-    nxt_str_t          enc, str;
-    njs_value_t        value;
-    njs_string_prop_t  string;
+    static const njs_value_t  unnamed = njs_string("Symbol()");
+    u_char             *p, *start;
+    size_t             size, length;
+    nxt_int_t                 ret;
+    nxt_str_t                 name, tag;
+    njs_value_t              value;
 
     ret = njs_symbol_prototype_value_of(vm, args, nargs, unused);
     if (nxt_slow_path(ret != NXT_OK)) {
         return ret;
     }
 
-    if (nargs < 2) {
-        return NJS_OK;
-    }
-
-    if (nxt_slow_path(!njs_is_string(&args[1]))) {
-        njs_type_error(vm, "encoding must be a string");
-        return NJS_ERROR;
-    }
-
     value = vm->retval;
 
-    (void) njs_string_prop(&string, &value);
+    njs_string_get(&value, &name);
 
-    if (nxt_slow_path(string.length != 0)) {
-        njs_type_error(vm, "argument must be a byte string");
-        return NJS_ERROR;
+    if (name.length == 0) {
+        vm->retval = unnamed;
+        return NXT_OK;
     }
 
-    njs_string_get(&args[1], &enc);
+    njs_string_get(&unnamed, &tag);
+    // ???
+    size = name.length + tag.length;
+    length = size;
 
-    str.length = string.size;
-    str.start = string.start;
-
-    if (enc.length == 3 && memcmp(enc.start, "hex", 3) == 0) {
-        return njs_string_hex(vm, &vm->retval, &str);
-
-    } else if (enc.length == 6 && memcmp(enc.start, "base64", 6) == 0) {
-        return njs_string_base64(vm, &vm->retval, &str);
-
-    } else if (enc.length == 9 && memcmp(enc.start, "base64url", 9) == 0) {
-        return njs_string_base64url(vm, &vm->retval, &str);
-    }
-
-    njs_type_error(vm, "Unknown encoding: '%.*s'", (int) enc.length, enc.start);
-
-    return NJS_ERROR;
-}
-
-/*
-njs_ret_t
-njs_primitive_value_to_string(njs_vm_t *vm, njs_value_t *dst,
-    const njs_value_t *src)
-{
-    const njs_value_t  *value;
-
-    switch (src->type) {
-
-    case NJS_NULL:
-        value = &njs_string_null;
-        break;
-
-    case NJS_VOID:
-        value = &njs_string_void;
-        break;
-
-    case NJS_BOOLEAN:
-        value = njs_is_true(src) ? &njs_string_true : &njs_string_false;
-        break;
-
-    case NJS_NUMBER:
-        return njs_number_to_string(vm, dst, src);
-
-    case NJS_STRING:
-        value = src;
-        break;
-
-    default:
+    start = njs_string_alloc(vm, &vm->retval, size, length);
+    if (nxt_slow_path(start == NULL)) {
         return NXT_ERROR;
     }
 
-    *dst = *value;
+    p = start;
+
+    p = memcpy(p, tag.start, tag.length - 1);
+    p += tag.length - 1;
+    p = memcpy(p, name.start, name.length);
+    p += name.length;
+    *p = ')';
 
     return NXT_OK;
 }
-*/
+
+
 static const njs_object_prop_t  njs_symbol_prototype_properties[] =
 {
     {

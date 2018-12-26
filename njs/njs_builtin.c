@@ -201,8 +201,7 @@ const njs_object_prototype_t  njs_prototype_values[] = {
     { .object_value = { .value = njs_value(NJS_NUMBER, 0, 0.0),
                         .object = { .type = NJS_OBJECT_NUMBER } } },
 
-    { .object_value = { .value = njs_value(NJS_SYMBOL, 1, NAN),
-                        .object = { .type = NJS_OBJECT_SYMBOL } } },
+    { .object =       { .type = NJS_OBJECT } },
 
     { .object_value = { .value = njs_string(""),
                         .object = { .type = NJS_OBJECT_STRING } } },
