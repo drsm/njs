@@ -169,6 +169,7 @@ typedef struct njs_frame_s            njs_frame_t;
 typedef struct njs_native_frame_s     njs_native_frame_t;
 typedef struct njs_property_next_s    njs_property_next_t;
 typedef struct njs_parser_scope_s     njs_parser_scope_t;
+typedef struct njs_parser_node_s      njs_parser_node_t;
 
 
 union njs_value_s {
