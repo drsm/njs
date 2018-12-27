@@ -7446,7 +7446,141 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 #endif
 
-    { nxt_string("String()"),
+    /* Symbol */
+    /* https://tc39.github.io/ecma262/#sec-symbol-objects */
+
+    { nxt_string("typeof Symbol"),
+      nxt_string("function") },
+
+#if 0
+    { nxt_string("this.Symbol === Symbol"),
+      nxt_string("true") },
+#endif
+
+    { nxt_string("Symbol.name"),
+      nxt_string("Symbol") },
+
+    { nxt_string("Symbol.length"),
+      nxt_string("0") },
+
+#if 0
+    { nxt_string("Symbol.prototype"),
+      nxt_string("{}") },
+#endif
+
+    { nxt_string("Symbol.prototype.constructor === Symbol"),
+      nxt_string("true") },
+
+    { nxt_string("new Symbol()"),
+      nxt_string("TypeError: Symbol is not a constructor") },
+
+    { nxt_string("typeof Symbol()"),
+      nxt_string("symbol") },
+
+    { nxt_string("typeof Symbol('name')"),
+      nxt_string("symbol") },
+
+    { nxt_string("Symbol()"),
+      nxt_string("Symbol()") },
+
+    { nxt_string("Symbol('name')"),
+      nxt_string("Symbol(name)") },
+
+#if 0
+    { nxt_string("Object(Symbol())"),
+      nxt_string("[Symbol: Symbol()]") },
+
+    { nxt_string("Object(Symbol('name'))"),
+      nxt_string("[Symbol: Symbol(name)]") },
+#endif
+
+    { nxt_string("typeof Object(Symbol('name'))"),
+      nxt_string("object") },
+
+    { nxt_string("var x = Symbol(), o = Object(x); x == o"),
+      nxt_string("true") },
+
+    { nxt_string("var x = Symbol(), o = Object(x); x !== o"),
+      nxt_string("true") },
+
+    { nxt_string("var x = Symbol(), o = Object(x); x === o.valueOf()"),
+      nxt_string("true") },
+
+#if 0
+    { nxt_string("Symbol() != Symbol()"),
+      nxt_string("true") },
+
+    { nxt_string("Symbol('name') != Symbol('name')"),
+      nxt_string("true") },
+#else
+
+    { nxt_string("Symbol() != Symbol('name')"),
+      nxt_string("true") },
+#endif
+
+#if 0
+    { nxt_string("!Symbol()"),
+      nxt_string("false") },
+
+    { nxt_string("!!Symbol()"),
+      nxt_string("true") },
+
+    { nxt_string("Symbol() != true"),
+      nxt_string("true") },
+
+    { nxt_string("Symbol() != 0"),
+      nxt_string("true") },
+
+    { nxt_string("Symbol() != ''"),
+      nxt_string("true") },
+
+    { nxt_string("Symbol() != undefined"),
+      nxt_string("true") },
+#endif
+
+    { nxt_string("typeof Symbol.prototype.valueOf.call(Object(Symbol()))"),
+      nxt_string("symbol") },
+
+    { nxt_string("typeof Symbol.prototype.valueOf.call(Object(Symbol()))"),
+      nxt_string("symbol") },
+
+    { nxt_string("var x = Symbol(); x === Symbol.prototype.valueOf.call(Object(x))"),
+      nxt_string("true") },
+
+    { nxt_string("Symbol.prototype.valueOf.call(Symbol())"),
+      nxt_string("Symbol()") },
+
+    { nxt_string("Symbol.prototype.valueOf.call(Symbol('name'))"),
+      nxt_string("Symbol(name)") },
+
+    { nxt_string("Symbol.prototype.valueOf.call(Object(Symbol()))"),
+      nxt_string("Symbol()") },
+
+    { nxt_string("Symbol.prototype.valueOf.call(Object(Symbol('name')))"),
+      nxt_string("Symbol(name)") },
+
+    { nxt_string("Symbol.prototype.valueOf.call(1)"),
+      nxt_string("TypeError: unexpected value type:number") },
+
+    { nxt_string("typeof Symbol.prototype.toString.call(Object(Symbol()))"),
+      nxt_string("string") },
+
+    { nxt_string("typeof Symbol.prototype.toString.call(Object(Symbol()))"),
+      nxt_string("string") },
+
+    { nxt_string("var x = Symbol(), f = x.constructor.toString; f.call(x) === f.call(Object(x))"),
+      nxt_string("true") },
+
+    { nxt_string("Symbol.prototype.toString.call(Object(Symbol()))"),
+      nxt_string("Symbol()") },
+
+    { nxt_string("Symbol.prototype.toString.call(Object(Symbol('name')))"),
+      nxt_string("Symbol(name)") },
+
+    { nxt_string("Symbol.prototype.toString.call(1)"),
+      nxt_string("TypeError: unexpected value type:number") },
+
+   { nxt_string("String()"),
       nxt_string("") },
 
     { nxt_string("new String()"),
@@ -7666,6 +7800,12 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Object.prototype.toString.call(1)"),
       nxt_string("[object Number]") },
 
+    { nxt_string("Object.prototype.toString.call(Symbol())"),
+      nxt_string("[object Symbol]") },
+
+    { nxt_string("Object.prototype.toString.call(Symbol('name'))"),
+      nxt_string("[object Symbol]") },
+
     { nxt_string("Object.prototype.toString.call('')"),
       nxt_string("[object String]") },
 
@@ -7683,6 +7823,12 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("Object.prototype.toString.call(new Object(1))"),
       nxt_string("[object Number]") },
+
+    { nxt_string("Object.prototype.toString.call(new Object(Symbol()))"),
+      nxt_string("[object Symbol]") },
+
+    { nxt_string("Object.prototype.toString.call(new Object(Symbol('name')))"),
+      nxt_string("[object Symbol]") },
 
     { nxt_string("Object.prototype.toString.call(new Object(''))"),
       nxt_string("[object String]") },
@@ -10605,6 +10751,18 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: Nested too deep or a cyclic structure") },
 
     /* njs.dump(). */
+
+    { nxt_string("njs.dump(Symbol())"),
+      nxt_string("Symbol()") },
+
+    { nxt_string("njs.dump(Symbol('name'))"),
+      nxt_string("Symbol(name)") },
+
+    { nxt_string("njs.dump(Object(Symbol()))"),
+      nxt_string("[Symbol: Symbol()]") },
+
+    { nxt_string("njs.dump(Object(Symbol('name')))"),
+      nxt_string("[Symbol: Symbol(name)]") },
 
     { nxt_string("njs.dump({a:1, b:[1,,2,{c:new Boolean(1)}]})"),
       nxt_string("{a:1,b:[1,<empty>,2,{c:[Boolean: true]}]}") },

@@ -7,6 +7,9 @@
 #ifndef _NJS_SYMBOL_H_INCLUDED_
 #define _NJS_SYMBOL_H_INCLUDED_
 
+njs_ret_t njs_symbol_to_string(njs_vm_t *vm, njs_value_t *string,
+    const njs_value_t *symbol);
+
 njs_ret_t njs_symbol_constructor(njs_vm_t *vm, njs_value_t *args,
     nxt_uint_t nargs, njs_index_t unused);
 

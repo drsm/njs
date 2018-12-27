@@ -3580,9 +3580,9 @@ njs_primitive_value_to_string(njs_vm_t *vm, njs_value_t *dst,
         return njs_number_to_string(vm, dst, src);
 
     case NJS_SYMBOL:
-        value = &njs_string_symbol_string;
+        return njs_symbol_to_string(vm, dst, src);
+        //value = &njs_string_symbol_string;
         break;
-        //return njs_symbol_to_string(vm, dst, src);
 
     case NJS_STRING:
         /* GC: njs_retain(src); */

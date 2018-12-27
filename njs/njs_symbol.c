@@ -8,6 +8,49 @@
 #include <string.h>
 
 njs_ret_t
+njs_symbol_to_string(njs_vm_t *vm, njs_value_t *string,
+    const njs_value_t *symbol)
+{
+    static const njs_value_t  unnamed = njs_string("Symbol()");
+    u_char                    *p, *start;
+    size_t                    size, length;
+    nxt_str_t                 name, tag;
+    njs_value_t               value;
+
+    njs_string_get(symbol, &name);
+
+    if (name.length == 0) {
+        *string = unnamed;
+
+        return NXT_OK;
+    }
+
+    njs_string_get(&unnamed, &tag);
+
+    // ???
+    size = name.length + tag.length;
+    length = size;
+
+    start = njs_string_alloc(vm, &value, size, length);
+    if (nxt_slow_path(start == NULL)) {
+        return NXT_ERROR;
+    }
+
+    p = start;
+
+    p = memcpy(p, tag.start, tag.length - 1);
+    p += tag.length - 1;
+    p = memcpy(p, name.start, name.length);
+    p += name.length;
+    *p = ')';
+
+    *string = value;
+
+    return NXT_OK;
+}
+
+
+njs_ret_t
 njs_symbol_constructor(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     njs_index_t unused)
 {
@@ -102,46 +145,14 @@ static njs_ret_t
 njs_symbol_prototype_to_string(njs_vm_t *vm, njs_value_t *args,
     nxt_uint_t nargs, njs_index_t unused)
 {
-    static const njs_value_t  unnamed = njs_string("Symbol()");
-    u_char             *p, *start;
-    size_t             size, length;
-    nxt_int_t                 ret;
-    nxt_str_t                 name, tag;
-    njs_value_t              value;
+    nxt_int_t  ret;
 
     ret = njs_symbol_prototype_value_of(vm, args, nargs, unused);
     if (nxt_slow_path(ret != NXT_OK)) {
         return ret;
     }
 
-    value = vm->retval;
-
-    njs_string_get(&value, &name);
-
-    if (name.length == 0) {
-        vm->retval = unnamed;
-        return NXT_OK;
-    }
-
-    njs_string_get(&unnamed, &tag);
-    // ???
-    size = name.length + tag.length;
-    length = size;
-
-    start = njs_string_alloc(vm, &vm->retval, size, length);
-    if (nxt_slow_path(start == NULL)) {
-        return NXT_ERROR;
-    }
-
-    p = start;
-
-    p = memcpy(p, tag.start, tag.length - 1);
-    p += tag.length - 1;
-    p = memcpy(p, name.start, name.length);
-    p += name.length;
-    *p = ')';
-
-    return NXT_OK;
+    return njs_symbol_to_string(vm, &vm->retval, &vm->retval);
 }
 
 
