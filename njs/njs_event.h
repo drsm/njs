@@ -12,23 +12,21 @@
 #define NJS_EVENT_DELETE       2
 
 
-#define njs_waiting_events(vm) (!nxt_lvlhsh_is_empty(&(vm)->events_hash))
-
-#define njs_posted_events(vm) (!nxt_queue_is_empty(&(vm)->posted_events))
+#define njs_is_pending_events(vm) (!nxt_lvlhsh_is_empty(&(vm)->events_hash))
 
 
 typedef struct {
-    njs_function_t          *function;
-    njs_value_t             *args;
-    nxt_uint_t              nargs;
-    njs_host_event_t        host_event;
-    njs_event_destructor_t  destructor;
+    njs_function_t        *function;
+    njs_value_t           *args;
+    nxt_uint_t            nargs;
+    njs_host_event_t      host_event;
+    njs_event_destructor  destructor;
 
-    njs_value_t             id;
-    nxt_queue_link_t        link;
+    njs_value_t           id;
+    nxt_queue_link_t      link;
 
-    unsigned                posted:1;
-    unsigned                once:1;
+    unsigned              posted:1;
+    unsigned              once:1;
 } njs_event_t;
 
 
