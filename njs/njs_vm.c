@@ -93,7 +93,6 @@ const njs_value_t  njs_string_plus_infinity =
                                             njs_string("Infinity");
 const njs_value_t  njs_string_nan =         njs_string("NaN");
 const njs_value_t  njs_string_symbol =      njs_string("symbol");
-const njs_value_t  njs_string_symbol_string =      njs_string("Symbol()");
 const njs_value_t  njs_string_string =      njs_string("string");
 const njs_value_t  njs_string_object =      njs_string("object");
 const njs_value_t  njs_string_function =    njs_string("function");
@@ -2930,6 +2929,12 @@ njs_vmcode_number_primitive(njs_vm_t *vm, njs_value_t *invld, njs_value_t *narg)
 
     value = &vm->top_frame->trap_values[(uintptr_t) narg];
 
+    if (value->type == NJS_SYMBOL || value->type == NJS_OBJECT_SYMBOL) {
+        njs_type_error(vm, "Cannot convert a Symbol value to a number");
+
+        return NXT_ERROR;
+    }
+
     ret = njs_primitive_value(vm, value, 0);
 
     if (nxt_fast_path(ret > 0)) {
@@ -2959,6 +2964,13 @@ njs_vmcode_string_primitive(njs_vm_t *vm, njs_value_t *invld, njs_value_t *narg)
 
     value = &vm->top_frame->trap_values[(uintptr_t) narg];
 
+    // ???
+    if (value->type == NJS_SYMBOL || value->type == NJS_OBJECT_SYMBOL) {
+        njs_type_error(vm, "Cannot convert a Symbol value to a string");
+
+        return NXT_ERROR;
+    }
+
     ret = njs_primitive_value(vm, value, 1);
 
     if (nxt_fast_path(ret > 0)) {
@@ -2982,6 +2994,12 @@ njs_vmcode_addition_primitive(njs_vm_t *vm, njs_value_t *invld,
     njs_value_t  *value;
 
     value = &vm->top_frame->trap_values[(uintptr_t) narg];
+
+    if (value->type == NJS_SYMBOL || value->type == NJS_OBJECT_SYMBOL) {
+        njs_type_error(vm, "Cannot convert a Symbol value to a number");
+
+        return NXT_ERROR;
+    }
 
     /*
      * ECMAScript 5.1:
@@ -3028,6 +3046,12 @@ njs_vmcode_number_argument(njs_vm_t *vm, njs_value_t *invld1,
 
     value = &vm->top_frame->trap_values[0];
 
+    if (value->type == NJS_SYMBOL || value->type == NJS_OBJECT_SYMBOL) {
+        njs_type_error(vm, "Cannot convert a Symbol value to a number");
+
+        return NXT_ERROR;
+    }
+
     ret = njs_primitive_value(vm, value, 0);
 
     if (nxt_fast_path(ret > 0)) {
@@ -3062,6 +3086,12 @@ njs_vmcode_string_argument(njs_vm_t *vm, njs_value_t *invld1,
     njs_value_t  *value;
 
     value = &vm->top_frame->trap_values[0];
+
+    if (value->type == NJS_SYMBOL || value->type == NJS_OBJECT_SYMBOL) {
+        njs_type_error(vm, "Cannot convert a Symbol value to a string");
+
+        return NXT_ERROR;
+    }
 
     ret = njs_primitive_value(vm, value, 1);
 
@@ -3535,6 +3565,12 @@ njs_vmcode_value_to_string(njs_vm_t *vm, njs_value_t *invld1,
     njs_value_t *invld2)
 {
     njs_ret_t  ret;
+
+    if (vm->top_frame->trap_values[0].type == NJS_SYMBOL || vm->top_frame->trap_values[0].type == NJS_OBJECT_SYMBOL) {
+        njs_type_error(vm, "Cannot convert a Symbol value to a string");
+
+        return NXT_ERROR;
+    }
 
     ret = njs_primitive_value(vm, &vm->top_frame->trap_values[0], 1);
 

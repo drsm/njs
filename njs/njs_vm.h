@@ -464,6 +464,10 @@ typedef njs_ret_t (*njs_vmcode_operation_t)(njs_vm_t *vm, njs_value_t *value1,
     ((value)->type <= NJS_NUMBER)
 
 
+#define njs_is_symbol(value)                                                  \
+    ((value)->type == NJS_SYMBOL)
+
+
 #define njs_is_string(value)                                                  \
     ((value)->type == NJS_STRING)
 

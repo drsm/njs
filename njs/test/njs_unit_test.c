@@ -7463,13 +7463,19 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Symbol.length"),
       nxt_string("0") },
 
+    { nxt_string("Symbol.prototype.constructor === Symbol"),
+      nxt_string("true") },
+
+    { nxt_string("Symbol.prototype.__proto__ === Object.prototype"),
+      nxt_string("true") },
+
+    { nxt_string("Object.prototype.toString.call(Symbol.prototype)"),
+      nxt_string("[object Object]") },
+
 #if 0
     { nxt_string("Symbol.prototype"),
       nxt_string("{}") },
 #endif
-
-    { nxt_string("Symbol.prototype.constructor === Symbol"),
-      nxt_string("true") },
 
     { nxt_string("new Symbol()"),
       nxt_string("TypeError: Symbol is not a constructor") },
@@ -7477,26 +7483,131 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("typeof Symbol()"),
       nxt_string("symbol") },
 
-    { nxt_string("typeof Symbol('name')"),
+    { nxt_string("typeof Symbol('desc')"),
       nxt_string("symbol") },
 
     { nxt_string("Symbol()"),
       nxt_string("Symbol()") },
 
-    { nxt_string("Symbol('name')"),
-      nxt_string("Symbol(name)") },
+    { nxt_string("Symbol('desc')"),
+      nxt_string("Symbol(desc)") },
+
+    { nxt_string("Symbol(undefined)"),
+      nxt_string("Symbol()") },
+
+    { nxt_string("Symbol(null)"),
+      nxt_string("Symbol(null)") },
+
+    { nxt_string("Symbol(123)"),
+      nxt_string("Symbol(123)") },
+
+    { nxt_string("Symbol(false)"),
+      nxt_string("Symbol(false)") },
+
+    { nxt_string("Symbol(Symbol())"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a string") },
+
+    { nxt_string("typeof Object(Symbol('desc'))"),
+      nxt_string("object") },
 
 #if 0
     { nxt_string("Object(Symbol())"),
-      nxt_string("[Symbol: Symbol()]") },
+      nxt_string("Symbol()") },
 
-    { nxt_string("Object(Symbol('name'))"),
-      nxt_string("[Symbol: Symbol(name)]") },
+    { nxt_string("Object(Symbol('desc'))"),
+      nxt_string("Symbol(desc)") },
+#else
+    { nxt_string("Object(Symbol()).toString()"),
+      nxt_string("Symbol()") },
+
+    { nxt_string("Object(Symbol('desc')).toString()"),
+      nxt_string("Symbol(desc)") },
 #endif
 
-    { nxt_string("typeof Object(Symbol('name'))"),
-      nxt_string("object") },
+    { nxt_string("String(Symbol())"),
+      nxt_string("Symbol()") },
 
+    { nxt_string("String(Symbol('desc'))"),
+      nxt_string("Symbol(desc)") },
+
+    { nxt_string("new String(Symbol())"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a string") },
+
+    { nxt_string("String(Object(Symbol()))"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a string") },
+
+    { nxt_string("+Symbol()"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+#if 0
+    { nxt_string("0 + Symbol()"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+#endif
+
+    { nxt_string("0 - Symbol()"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("0 * Symbol()"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("0 ** Symbol()"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("0 / Symbol()"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+#if 0
+    { nxt_string("Symbol() + 0"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+#endif
+
+    { nxt_string("Symbol() - 0"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("Symbol() * 0"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("Symbol() ** 0"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("Symbol() / 0"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("Math.min(Symbol())"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+#if 0
+    { nxt_string("Array.prototype.slice.call({ length: Symbol() })"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("Array.prototype.slice.call({ length: { valueOf: function() { return Symbol(); } } })"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+#endif
+
+    { nxt_string("Array.prototype.slice.call({ length: Object(Symbol()) })"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("0 + Object(Symbol())"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+    { nxt_string("Object(Symbol()) + Object(Symbol())"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a number") },
+
+#if 0
+    { nxt_string("'' + Object(Symbol())"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a string") },
+
+    { nxt_string("Object(Symbol()) + ''"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a string") },
+#endif
+
+    { nxt_string("''.concat(Symbol())"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a string") },
+
+    { nxt_string("''.concat(Object(Symbol()))"),
+      nxt_string("TypeError: Cannot convert a Symbol value to a string") },
+
+#if 0
     { nxt_string("var x = Symbol(), o = Object(x); x == o"),
       nxt_string("true") },
 
@@ -7505,16 +7616,17 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var x = Symbol(), o = Object(x); x === o.valueOf()"),
       nxt_string("true") },
+#endif
 
 #if 0
     { nxt_string("Symbol() != Symbol()"),
       nxt_string("true") },
 
-    { nxt_string("Symbol('name') != Symbol('name')"),
+    { nxt_string("Symbol('desc') != Symbol('desc')"),
       nxt_string("true") },
 #else
 
-    { nxt_string("Symbol() != Symbol('name')"),
+    { nxt_string("Symbol() != Symbol('desc')"),
       nxt_string("true") },
 #endif
 
@@ -7550,14 +7662,14 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Symbol.prototype.valueOf.call(Symbol())"),
       nxt_string("Symbol()") },
 
-    { nxt_string("Symbol.prototype.valueOf.call(Symbol('name'))"),
-      nxt_string("Symbol(name)") },
+    { nxt_string("Symbol.prototype.valueOf.call(Symbol('desc'))"),
+      nxt_string("Symbol(desc)") },
 
     { nxt_string("Symbol.prototype.valueOf.call(Object(Symbol()))"),
       nxt_string("Symbol()") },
 
-    { nxt_string("Symbol.prototype.valueOf.call(Object(Symbol('name')))"),
-      nxt_string("Symbol(name)") },
+    { nxt_string("Symbol.prototype.valueOf.call(Object(Symbol('desc')))"),
+      nxt_string("Symbol(desc)") },
 
     { nxt_string("Symbol.prototype.valueOf.call(1)"),
       nxt_string("TypeError: unexpected value type:number") },
@@ -7574,8 +7686,8 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Symbol.prototype.toString.call(Object(Symbol()))"),
       nxt_string("Symbol()") },
 
-    { nxt_string("Symbol.prototype.toString.call(Object(Symbol('name')))"),
-      nxt_string("Symbol(name)") },
+    { nxt_string("Symbol.prototype.toString.call(Object(Symbol('desc')))"),
+      nxt_string("Symbol(desc)") },
 
     { nxt_string("Symbol.prototype.toString.call(1)"),
       nxt_string("TypeError: unexpected value type:number") },
@@ -7803,7 +7915,7 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Object.prototype.toString.call(Symbol())"),
       nxt_string("[object Symbol]") },
 
-    { nxt_string("Object.prototype.toString.call(Symbol('name'))"),
+    { nxt_string("Object.prototype.toString.call(Symbol('desc'))"),
       nxt_string("[object Symbol]") },
 
     { nxt_string("Object.prototype.toString.call('')"),
@@ -7827,7 +7939,7 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Object.prototype.toString.call(new Object(Symbol()))"),
       nxt_string("[object Symbol]") },
 
-    { nxt_string("Object.prototype.toString.call(new Object(Symbol('name')))"),
+    { nxt_string("Object.prototype.toString.call(new Object(Symbol('desc')))"),
       nxt_string("[object Symbol]") },
 
     { nxt_string("Object.prototype.toString.call(new Object(''))"),
@@ -10755,14 +10867,14 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("njs.dump(Symbol())"),
       nxt_string("Symbol()") },
 
-    { nxt_string("njs.dump(Symbol('name'))"),
-      nxt_string("Symbol(name)") },
+    { nxt_string("njs.dump(Symbol('desc'))"),
+      nxt_string("Symbol(desc)") },
 
     { nxt_string("njs.dump(Object(Symbol()))"),
       nxt_string("[Symbol: Symbol()]") },
 
-    { nxt_string("njs.dump(Object(Symbol('name')))"),
-      nxt_string("[Symbol: Symbol(name)]") },
+    { nxt_string("njs.dump(Object(Symbol('desc')))"),
+      nxt_string("[Symbol: Symbol(desc)]") },
 
     { nxt_string("njs.dump({a:1, b:[1,,2,{c:new Boolean(1)}]})"),
       nxt_string("{a:1,b:[1,<empty>,2,{c:[Boolean: true]}]}") },

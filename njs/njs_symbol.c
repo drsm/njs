@@ -64,7 +64,7 @@ njs_symbol_constructor(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         return NXT_ERROR;
     }
 
-    if (nargs == 1) {
+    if (nargs == 1 || (nargs > 1 && njs_is_void(&args[1]))) {
         value = &vm->retval;
 
         value->short_string.size = 0;
@@ -72,6 +72,13 @@ njs_symbol_constructor(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 
     } else {
         value = &args[1];
+
+        if (!njs_is_string(value)) {
+            njs_vm_trap_value(vm, value);
+
+            return njs_trap(vm, NJS_TRAP_STRING_ARG);
+        }
+
         vm->retval = *value;
     }
 

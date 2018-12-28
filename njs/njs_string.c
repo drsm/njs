@@ -534,7 +534,7 @@ njs_string_prop(njs_string_prop_t *string, njs_value_t *value)
     return (length == 0) ? size : length;
 }
 
-
+/* https://tc39.github.io/ecma262/#sec-string-constructor */
 njs_ret_t
 njs_string_constructor(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     njs_index_t unused)
@@ -547,6 +547,16 @@ njs_string_constructor(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 
     } else {
         value = &args[1];
+
+        if (!vm->top_frame->ctor && njs_is_symbol(value)) {
+            return njs_symbol_to_string(vm, &vm->retval, value);
+        }
+
+        if (!njs_is_string(value)) {
+            njs_vm_trap_value(vm, &args[1]);
+
+            return njs_trap(vm, NJS_TRAP_STRING_ARG);
+        }
     }
 
     if (vm->top_frame->ctor) {
@@ -3581,7 +3591,6 @@ njs_primitive_value_to_string(njs_vm_t *vm, njs_value_t *dst,
 
     case NJS_SYMBOL:
         return njs_symbol_to_string(vm, dst, src);
-        //value = &njs_string_symbol_string;
         break;
 
     case NJS_STRING:
