@@ -125,15 +125,15 @@ typedef void *                      njs_vm_event_t;
 typedef void *                      njs_host_event_t;
 typedef void *                      njs_external_ptr_t;
 
-typedef njs_host_event_t (*njs_set_timer)(njs_external_ptr_t external,
+typedef njs_host_event_t (*njs_set_timer_t)(njs_external_ptr_t external,
     uint64_t delay, njs_vm_event_t vm_event);
-typedef void (*njs_event_destructor)(njs_external_ptr_t external,
+typedef void (*njs_event_destructor_t)(njs_external_ptr_t external,
     njs_host_event_t event);
 
 
 typedef struct {
-    njs_set_timer                   set_timer;
-    njs_event_destructor            clear_timer;
+    njs_set_timer_t                 set_timer;
+    njs_event_destructor_t          clear_timer;
 } njs_vm_ops_t;
 
 
@@ -162,18 +162,55 @@ NXT_EXPORT void njs_vm_destroy(njs_vm_t *vm);
 
 NXT_EXPORT nxt_int_t njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end);
 NXT_EXPORT njs_vm_t *njs_vm_clone(njs_vm_t *vm, njs_external_ptr_t external);
-NXT_EXPORT nxt_int_t njs_vm_call(njs_vm_t *vm, njs_function_t *function,
-    const njs_value_t *args, nxt_uint_t nargs);
 
 NXT_EXPORT njs_vm_event_t njs_vm_add_event(njs_vm_t *vm,
     njs_function_t *function, nxt_uint_t once, njs_host_event_t host_ev,
-    njs_event_destructor destructor);
+    njs_event_destructor_t destructor);
 NXT_EXPORT void njs_vm_del_event(njs_vm_t *vm, njs_vm_event_t vm_event);
-NXT_EXPORT nxt_int_t njs_vm_pending(njs_vm_t *vm);
 NXT_EXPORT nxt_int_t njs_vm_post_event(njs_vm_t *vm, njs_vm_event_t vm_event,
     const njs_value_t *args, nxt_uint_t nargs);
 
+/*
+ * Returns 1 if async events are present.
+ */
+NXT_EXPORT nxt_int_t njs_vm_waiting(njs_vm_t *vm);
+
+/*
+ * Returns 1 if posted events are ready to be executed.
+ */
+NXT_EXPORT nxt_int_t njs_vm_posted(njs_vm_t *vm);
+
+#define njs_vm_pending(vm)  (njs_vm_waiting(vm) || njs_vm_posted(vm))
+
+
+/*
+ * Runs the specified function with provided arguments.
+ *  NJS_OK successful run.
+ *  NJS_ERROR some exception or internal error happens.
+ *
+ *  njs_vm_retval(vm) can be used to get the retval or exception value.
+ */
+NXT_EXPORT nxt_int_t njs_vm_call(njs_vm_t *vm, njs_function_t *function,
+    const njs_value_t *args, nxt_uint_t nargs);
+
+/*
+ * Runs posted events.
+ *  NJS_OK successfully processed all posted events, no more events.
+ *  NJS_AGAIN successfully processed all events, some posted events are
+ *    still pending.
+ *  NJS_ERROR some exception or internal error happens.
+ *    njs_vm_retval(vm) can be used to get the retval or exception value.
+ */
 NXT_EXPORT nxt_int_t njs_vm_run(njs_vm_t *vm);
+
+/*
+ * Runs the global code.
+ *   NJS_OK successful run.
+ *   NJS_ERROR some exception or internal error happens.
+ *
+ *   njs_vm_retval(vm) can be used to get the retval or exception value.
+ */
+NXT_EXPORT nxt_int_t njs_vm_start(njs_vm_t *vm);
 
 NXT_EXPORT const njs_extern_t *njs_vm_external_prototype(njs_vm_t *vm,
     njs_external_t *external);

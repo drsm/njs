@@ -196,7 +196,7 @@ njs_vm_destroy(njs_vm_t *vm)
     njs_event_t        *event;
     nxt_lvlhsh_each_t  lhe;
 
-    if (njs_is_pending_events(vm)) {
+    if (njs_waiting_events(vm)) {
         nxt_lvlhsh_each_init(&lhe, &njs_event_hash_proto);
 
         for ( ;; ) {
@@ -521,7 +521,7 @@ njs_vm_call(njs_vm_t *vm, njs_function_t *function, const njs_value_t *args,
 
 njs_vm_event_t
 njs_vm_add_event(njs_vm_t *vm, njs_function_t *function, nxt_uint_t once,
-    njs_host_event_t host_ev, njs_event_destructor destructor)
+    njs_host_event_t host_ev, njs_event_destructor_t destructor)
 {
     njs_event_t  *event;
 
@@ -558,9 +558,16 @@ njs_vm_del_event(njs_vm_t *vm, njs_vm_event_t vm_event)
 
 
 nxt_int_t
-njs_vm_pending(njs_vm_t *vm)
+njs_vm_waiting(njs_vm_t *vm)
 {
-    return njs_is_pending_events(vm);
+    return njs_waiting_events(vm);
+}
+
+
+nxt_int_t
+njs_vm_posted(njs_vm_t *vm)
+{
+    return njs_posted_events(vm);
 }
 
 
@@ -595,27 +602,26 @@ njs_vm_post_event(njs_vm_t *vm, njs_vm_event_t vm_event,
 nxt_int_t
 njs_vm_run(njs_vm_t *vm)
 {
-    nxt_int_t  ret;
-
     if (nxt_slow_path(vm->backtrace != NULL)) {
         nxt_array_reset(vm->backtrace);
     }
 
+    return njs_vm_handle_events(vm);
+}
+
+
+nxt_int_t
+njs_vm_start(njs_vm_t *vm)
+{
+    njs_ret_t  ret;
+
     ret = njs_vmcode_interpreter(vm);
 
     if (ret == NJS_STOP) {
-        ret = njs_vm_handle_events(vm);
+        ret = NJS_OK;
     }
 
-    switch (ret) {
-    case NJS_STOP:
-        return NJS_OK;
-
-    case NXT_AGAIN:
-    case NXT_ERROR:
-    default:
-        return ret;
-    }
+    return ret;
 }
 
 
@@ -653,7 +659,7 @@ njs_vm_handle_events(njs_vm_t *vm)
         }
     }
 
-    return njs_is_pending_events(vm) ? NJS_AGAIN : NJS_STOP;
+    return njs_posted_events(vm) ? NJS_AGAIN : NJS_OK;
 }
 
 
