@@ -138,6 +138,7 @@ njs_symbol_prototype_value_of(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         } else {
             njs_type_error(vm, "unexpected value type:%s",
                            njs_type_string(value->type));
+
             return NXT_ERROR;
         }
     }
