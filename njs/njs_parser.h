@@ -138,6 +138,7 @@ typedef enum {
     NJS_TOKEN_EXTERNAL,
 
     NJS_TOKEN_STATEMENT,
+    NJS_TOKEN_BLOCK,
     NJS_TOKEN_VAR,
     NJS_TOKEN_IF,
     NJS_TOKEN_ELSE,
@@ -231,6 +232,8 @@ typedef struct {
 
 
 struct njs_parser_scope_s {
+    njs_parser_node_t               *node;
+
     nxt_queue_link_t                link;
     nxt_queue_t                     nested;
 
@@ -238,10 +241,9 @@ struct njs_parser_scope_s {
     nxt_lvlhsh_t                    variables;
     nxt_lvlhsh_t                    references;
 
-    /*
-     * 0: local scope index;
-     * 1: closure scope index.
-     */
+#define NJS_SCOPE_INDEX_LOCAL       0
+#define NJS_SCOPE_INDEX_CLOSURE     1
+
     nxt_array_t                     *values[2];  /* Array of njs_value_t. */
     njs_index_t                     next_index[2];
 
@@ -289,7 +291,6 @@ struct njs_parser_s {
     njs_lexer_t                     *lexer;
     njs_parser_node_t               *node;
     njs_parser_scope_t              *scope;
-    njs_parser_t                    *parent;
 };
 
 
@@ -308,7 +309,7 @@ njs_token_t njs_lexer_keyword(njs_lexer_t *lexer);
 
 njs_value_t *njs_parser_external(njs_vm_t *vm, njs_parser_t *parser);
 
-njs_parser_node_t *njs_parser(njs_vm_t *vm, njs_parser_t *parser,
+nxt_int_t njs_parser(njs_vm_t *vm, njs_parser_t *parser,
     njs_parser_t *prev);
 njs_token_t njs_parser_arguments(njs_vm_t *vm, njs_parser_t *parser,
     njs_parser_node_t *parent);
@@ -325,7 +326,7 @@ njs_token_t njs_parser_property_name(njs_vm_t *vm, njs_parser_t *parser,
 njs_token_t njs_parser_property_token(njs_parser_t *parser);
 njs_token_t njs_parser_token(njs_parser_t *parser);
 nxt_int_t njs_parser_string_create(njs_vm_t *vm, njs_value_t *value);
-njs_variable_t *njs_variable_get(njs_vm_t *vm, njs_parser_node_t *node);
+njs_variable_t *njs_variable_resolve(njs_vm_t *vm, njs_parser_node_t *node);
 njs_index_t njs_variable_typeof(njs_vm_t *vm, njs_parser_node_t *node);
 njs_index_t njs_variable_index(njs_vm_t *vm, njs_parser_node_t *node);
 nxt_bool_t njs_parser_has_side_effect(njs_parser_node_t *node);

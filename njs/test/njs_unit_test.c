@@ -4017,6 +4017,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("var f = ''.concat.bind(0, 1, 2, 3, 4); f(5, 6, 7, 8, 9)"),
       nxt_string("0123456789") },
 
+    { nxt_string("var f = ''.concat.bind(0, 1, 2, 3, 4); f(Math.sqrt(25))"),
+      nxt_string("012345") },
+
     { nxt_string("var f = String.prototype.concat.bind(0, 1); f(2)"),
       nxt_string("012") },
 
@@ -6898,6 +6901,9 @@ static njs_unit_test_t  njs_test[] =
                  "  finally { return val; }"
                  "})(function () {throw 'a'}, 'v')"),
       nxt_string("v") },
+
+    { nxt_string("(function() { try { return ['a'];} finally {} } )()"),
+      nxt_string("a") },
 
     { nxt_string("var o = { valueOf: function() { return '3' } }; --o"),
       nxt_string("2") },

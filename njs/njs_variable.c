@@ -9,8 +9,8 @@
 #include <string.h>
 
 
-static njs_ret_t njs_variable_find(njs_vm_t *vm, njs_parser_scope_t *scope,
-    njs_variable_reference_t *vr);
+static njs_ret_t njs_variable_reference_resolve(njs_vm_t *vm,
+    njs_variable_reference_t *vr, njs_parser_scope_t *node_scope);
 static njs_variable_t *njs_variable_alloc(njs_vm_t *vm, nxt_str_t *name,
     njs_variable_type_t type);
 
@@ -191,25 +191,17 @@ njs_variables_scope_resolve(njs_vm_t *vm, njs_parser_scope_t *scope,
             vr = &node->u.reference;
 
             if (closure) {
-                ret = njs_variable_find(vm, node->scope, vr);
+                ret = njs_variable_reference_resolve(vm, vr, node->scope);
                 if (nxt_slow_path(ret != NXT_OK)) {
                     continue;
                 }
 
-                if (vr->scope->type == NJS_SCOPE_GLOBAL) {
-                    continue;
-                }
-
-                if (node->scope->nesting == vr->scope->nesting) {
-                    /*
-                     * A variable is referenced locally here, but may be
-                     * referenced non-locally in other places, skipping.
-                     */
+                if (vr->scope_index == NJS_SCOPE_INDEX_LOCAL) {
                     continue;
                 }
             }
 
-            var = njs_variable_get(vm, node);
+            var = njs_variable_resolve(vm, node);
 
             if (nxt_slow_path(var == NULL)) {
                 if (vr->type != NJS_TYPEOF) {
@@ -260,7 +252,7 @@ njs_variable_typeof(njs_vm_t *vm, njs_parser_node_t *node)
 
     vr = &node->u.reference;
 
-    ret = njs_variable_find(vm, node->scope, vr);
+    ret = njs_variable_reference_resolve(vm, vr, node->scope);
 
     if (nxt_fast_path(ret == NXT_OK)) {
         return vr->variable->index;
@@ -279,7 +271,7 @@ njs_variable_index(njs_vm_t *vm, njs_parser_node_t *node)
         return node->index;
     }
 
-    var = njs_variable_get(vm, node);
+    var = njs_variable_resolve(vm, node);
 
     if (nxt_fast_path(var != NULL)) {
         return var->index;
@@ -290,7 +282,7 @@ njs_variable_index(njs_vm_t *vm, njs_parser_node_t *node)
 
 
 njs_variable_t *
-njs_variable_get(njs_vm_t *vm, njs_parser_node_t *node)
+njs_variable_resolve(njs_vm_t *vm, njs_parser_node_t *node)
 {
     nxt_int_t                 ret;
     nxt_uint_t                scope_index;
@@ -302,24 +294,22 @@ njs_variable_get(njs_vm_t *vm, njs_parser_node_t *node)
 
     vr = &node->u.reference;
 
-    ret = njs_variable_find(vm, node->scope, vr);
+    ret = njs_variable_reference_resolve(vm, vr, node->scope);
 
     if (nxt_slow_path(ret != NXT_OK)) {
         goto not_found;
     }
 
-    scope_index = 0;
-
-    if (vr->scope->type > NJS_SCOPE_GLOBAL) {
-        scope_index = (node->scope->nesting != vr->scope->nesting);
-    }
+    scope_index = vr->scope_index;
 
     var = vr->variable;
     index = var->index;
 
     if (index != NJS_INDEX_NONE) {
 
-        if (scope_index == 0 || njs_scope_type(index) != NJS_SCOPE_ARGUMENTS) {
+        if (scope_index == NJS_SCOPE_INDEX_LOCAL
+            || njs_scope_type(index) != NJS_SCOPE_ARGUMENTS)
+        {
             node->index = index;
 
             return var;
@@ -400,16 +390,17 @@ not_found:
 
 
 static njs_ret_t
-njs_variable_find(njs_vm_t *vm, njs_parser_scope_t *scope,
-    njs_variable_reference_t *vr)
+njs_variable_reference_resolve(njs_vm_t *vm, njs_variable_reference_t *vr,
+    njs_parser_scope_t *node_scope)
 {
     nxt_lvlhsh_query_t  lhq;
-    njs_parser_scope_t  *parent, *previous;
+    njs_parser_scope_t  *scope, *parent, *previous;
 
     lhq.key_hash = vr->hash;
     lhq.key = vr->name;
     lhq.proto = &njs_variables_hash_proto;
 
+    scope = node_scope;
     previous = NULL;
 
     for ( ;; ) {
@@ -430,6 +421,14 @@ njs_variable_find(njs_vm_t *vm, njs_parser_scope_t *scope,
             }
 
             vr->scope = scope;
+
+            vr->scope_index = NJS_SCOPE_INDEX_LOCAL;
+
+            if (vr->scope->type > NJS_SCOPE_GLOBAL
+                && node_scope->nesting != vr->scope->nesting)
+            {
+                vr->scope_index = NJS_SCOPE_INDEX_CLOSURE;
+            }
 
             return NXT_OK;
         }

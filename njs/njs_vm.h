@@ -1021,12 +1021,6 @@ struct njs_vm_s {
     /* njs_vm_t must be aligned to njs_value_t due to scratch value. */
     njs_value_t              retval;
 
-    /*
-     * The scratch value is used for lvalue operations on nonexistent
-     * properties of non-object values: "a = 1; a.b++".
-     */
-    njs_value_t              scratch;
-
     u_char                   *current;
 
     njs_value_t              *scopes[NJS_SCOPES];
@@ -1262,8 +1256,6 @@ njs_ret_t njs_vmcode_finally(njs_vm_t *vm, njs_value_t *invld,
 nxt_bool_t njs_values_strict_equal(const njs_value_t *val1,
     const njs_value_t *val2);
 
-njs_ret_t njs_normalize_args(njs_vm_t *vm, njs_value_t *args,
-    uint8_t *args_types, nxt_uint_t nargs);
 const char *njs_type_string(njs_value_type_t type);
 const char *njs_arg_type_string(uint8_t arg);
 
@@ -1306,7 +1298,7 @@ extern const njs_value_t  njs_string_memory_error;
 extern const nxt_mem_proto_t     njs_array_mem_proto;
 extern const nxt_lvlhsh_proto_t  njs_object_hash_proto;
 
-extern const njs_vmcode_1addr_t  njs_continuation_nexus[];
+extern const njs_vmcode_generic_t  njs_continuation_nexus[];
 
 
 #endif /* _NJS_VM_H_INCLUDED_ */

@@ -149,7 +149,6 @@ struct njs_frame_s {
 
 njs_function_t *njs_function_alloc(njs_vm_t *vm);
 njs_function_t *njs_function_value_copy(njs_vm_t *vm, njs_value_t *value);
-njs_native_frame_t *njs_function_frame_alloc(njs_vm_t *vm, size_t size);
 njs_ret_t njs_function_arguments_object_init(njs_vm_t *vm,
     njs_native_frame_t *frame);
 njs_ret_t njs_function_rest_parameters_init(njs_vm_t *vm,
@@ -162,15 +161,61 @@ njs_value_t *njs_function_property_prototype_create(njs_vm_t *vm,
     njs_value_t *value);
 njs_ret_t njs_function_constructor(njs_vm_t *vm, njs_value_t *args,
     nxt_uint_t nargs, njs_index_t unused);
-njs_ret_t njs_function_apply(njs_vm_t *vm, njs_function_t *function,
-    njs_value_t *args, nxt_uint_t nargs, njs_index_t retval);
 njs_ret_t njs_function_native_frame(njs_vm_t *vm, njs_function_t *function,
     const njs_value_t *this, const njs_value_t *args, nxt_uint_t nargs,
-    size_t reserve, nxt_bool_t ctor);
-njs_ret_t njs_function_frame(njs_vm_t *vm, njs_function_t *function,
+    size_t continuation_size, nxt_bool_t ctor);
+njs_ret_t njs_function_lambda_frame(njs_vm_t *vm, njs_function_t *function,
     const njs_value_t *this, const njs_value_t *args, nxt_uint_t nargs,
     nxt_bool_t ctor);
-njs_ret_t njs_function_call(njs_vm_t *vm, njs_index_t retval, size_t advance);
+njs_ret_t njs_function_activate(njs_vm_t *vm, njs_function_t *function,
+    const njs_value_t *this, const njs_value_t *args, nxt_uint_t nargs,
+    njs_index_t retval, size_t advance);
+njs_ret_t njs_function_lambda_call(njs_vm_t *vm, njs_index_t retval,
+    u_char *return_address);
+njs_ret_t njs_function_native_call(njs_vm_t *vm, njs_function_native_t native,
+    njs_value_t *args, uint8_t *args_types, nxt_uint_t nargs,
+    njs_index_t retval);
+void njs_function_frame_free(njs_vm_t *vm, njs_native_frame_t *frame);
+
+
+nxt_inline njs_ret_t
+njs_function_frame(njs_vm_t *vm, njs_function_t *function,
+    const njs_value_t *this, const njs_value_t *args, nxt_uint_t nargs,
+    size_t continuation_size, nxt_bool_t ctor)
+{
+    if (function->native) {
+        return njs_function_native_frame(vm, function, this, args, nargs,
+                                         continuation_size, ctor);
+
+    } else {
+        return njs_function_lambda_frame(vm, function, this, args, nargs, ctor);
+    }
+}
+
+
+nxt_inline njs_ret_t
+njs_function_apply(njs_vm_t *vm, njs_function_t *function,
+    const njs_value_t *args, nxt_uint_t nargs, njs_index_t retval)
+{
+    return njs_function_activate(vm, function, &args[0], &args[1], nargs - 1,
+                                 retval, 0);
+}
+
+
+nxt_inline njs_native_frame_t *
+njs_function_previous_frame(njs_native_frame_t *frame)
+{
+    njs_native_frame_t  *previous;
+
+    do {
+        previous = frame->previous;
+        frame = previous;
+
+    } while (frame->skip);
+
+    return frame;
+}
+
 
 extern const njs_object_init_t  njs_function_constructor_init;
 extern const njs_object_init_t  njs_function_prototype_init;
