@@ -10,6 +10,8 @@
 
 
 static nxt_int_t njs_vm_init(njs_vm_t *vm);
+static nxt_int_t njs_vm_invoke(njs_vm_t *vm, njs_function_t *function,
+    const njs_value_t *args, nxt_uint_t nargs, njs_index_t retval);
 static nxt_int_t njs_vm_handle_events(njs_vm_t *vm);
 
 
@@ -49,7 +51,7 @@ njs_free(void *mem, void *p)
 }
 
 
-const nxt_mem_proto_t  njs_vm_mem_cache_pool_proto = {
+const nxt_mem_proto_t  njs_vm_mp_proto = {
     njs_alloc,
     njs_zalloc,
     njs_align,
@@ -63,14 +65,14 @@ const nxt_mem_proto_t  njs_vm_mem_cache_pool_proto = {
 static void *
 njs_array_mem_alloc(void *mem, size_t size)
 {
-    return nxt_mem_cache_alloc(mem, size);
+    return nxt_mp_alloc(mem, size);
 }
 
 
 static void
 njs_array_mem_free(void *mem, void *p)
 {
-    nxt_mem_cache_free(mem, p);
+    nxt_mp_free(mem, p);
 }
 
 
@@ -88,22 +90,22 @@ const nxt_mem_proto_t  njs_array_mem_proto = {
 njs_vm_t *
 njs_vm_create(njs_vm_opt_t *options)
 {
+    nxt_mp_t              *mp;
     njs_vm_t              *vm;
     nxt_int_t             ret;
     nxt_array_t           *debug;
-    nxt_mem_cache_pool_t  *mcp;
     njs_regexp_pattern_t  *pattern;
 
-    mcp = nxt_mem_cache_pool_create(&njs_vm_mem_cache_pool_proto, NULL,
-                                    NULL, 2 * nxt_pagesize(), 128, 512, 16);
-    if (nxt_slow_path(mcp == NULL)) {
+    mp = nxt_mp_create(&njs_vm_mp_proto, NULL, NULL, 2 * nxt_pagesize(),
+                       128, 512, 16);
+    if (nxt_slow_path(mp == NULL)) {
         return NULL;
     }
 
-    vm = nxt_mem_cache_zalign(mcp, sizeof(njs_value_t), sizeof(njs_vm_t));
+    vm = nxt_mp_zalign(mp, sizeof(njs_value_t), sizeof(njs_vm_t));
 
     if (nxt_fast_path(vm != NULL)) {
-        vm->mem_cache_pool = mcp;
+        vm->mem_pool = mp;
 
         ret = njs_regexp_init(vm);
         if (nxt_slow_path(ret != NXT_OK)) {
@@ -116,7 +118,7 @@ njs_vm_create(njs_vm_opt_t *options)
             vm->shared = options->shared;
 
         } else {
-            vm->shared = nxt_mem_cache_zalloc(mcp, sizeof(njs_vm_shared_t));
+            vm->shared = nxt_mp_zalloc(mp, sizeof(njs_vm_shared_t));
             if (nxt_slow_path(vm->shared == NULL)) {
                 return NULL;
             }
@@ -125,7 +127,7 @@ njs_vm_create(njs_vm_opt_t *options)
 
             nxt_lvlhsh_init(&vm->shared->keywords_hash);
 
-            ret = njs_lexer_keywords_init(mcp, &vm->shared->keywords_hash);
+            ret = njs_lexer_keywords_init(mp, &vm->shared->keywords_hash);
             if (nxt_slow_path(ret != NXT_OK)) {
                 return NULL;
             }
@@ -154,7 +156,7 @@ njs_vm_create(njs_vm_opt_t *options)
 
         vm->external_objects = nxt_array_create(4, sizeof(void *),
                                                 &njs_array_mem_proto,
-                                                vm->mem_cache_pool);
+                                                vm->mem_pool);
         if (nxt_slow_path(vm->external_objects == NULL)) {
             return NULL;
         }
@@ -169,8 +171,7 @@ njs_vm_create(njs_vm_opt_t *options)
 
         if (options->backtrace) {
             debug = nxt_array_create(4, sizeof(njs_function_debug_t),
-                                     &njs_array_mem_proto,
-                                     vm->mem_cache_pool);
+                                     &njs_array_mem_proto, vm->mem_pool);
             if (nxt_slow_path(debug == NULL)) {
                 return NULL;
             }
@@ -210,7 +211,7 @@ njs_vm_destroy(njs_vm_t *vm)
         }
     }
 
-    nxt_mem_cache_pool_destroy(vm->mem_cache_pool);
+    nxt_mp_destroy(vm->mem_pool);
 }
 
 
@@ -222,7 +223,7 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
     njs_parser_t     *parser, *prev;
     njs_generator_t  *generator;
 
-    parser = nxt_mem_cache_zalloc(vm->mem_cache_pool, sizeof(njs_parser_t));
+    parser = nxt_mp_zalloc(vm->mem_pool, sizeof(njs_parser_t));
     if (nxt_slow_path(parser == NULL)) {
         return NJS_ERROR;
     }
@@ -234,7 +235,7 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
     prev = vm->parser;
     vm->parser = parser;
 
-    lexer = nxt_mem_cache_zalloc(vm->mem_cache_pool, sizeof(njs_lexer_t));
+    lexer = nxt_mp_zalloc(vm->mem_pool, sizeof(njs_lexer_t));
     if (nxt_slow_path(lexer == NULL)) {
         return NJS_ERROR;
     }
@@ -243,6 +244,7 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
     lexer->start = *start;
     lexer->end = end;
     lexer->line = 1;
+    lexer->file = vm->options.file;
     lexer->keywords_hash = vm->shared->keywords_hash;
 
     if (vm->backtrace != NULL) {
@@ -269,8 +271,8 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
      */
     vm->code = NULL;
 
-    generator = nxt_mem_cache_align(vm->mem_cache_pool, sizeof(njs_value_t),
-                                    sizeof(njs_generator_t));
+    generator = nxt_mp_align(vm->mem_pool, sizeof(njs_value_t),
+                             sizeof(njs_generator_t));
 
     if (nxt_slow_path(generator == NULL)) {
         goto fail;
@@ -310,11 +312,11 @@ fail:
 njs_vm_t *
 njs_vm_clone(njs_vm_t *vm, njs_external_ptr_t external)
 {
-    njs_vm_t              *nvm;
-    uint32_t              items;
-    nxt_int_t             ret;
-    nxt_array_t           *externals;
-    nxt_mem_cache_pool_t  *nmcp;
+    nxt_mp_t     *nmp;
+    njs_vm_t     *nvm;
+    uint32_t     items;
+    nxt_int_t    ret;
+    nxt_array_t  *externals;
 
     nxt_thread_log_debug("CLONE:");
 
@@ -322,16 +324,16 @@ njs_vm_clone(njs_vm_t *vm, njs_external_ptr_t external)
         return NULL;
     }
 
-    nmcp = nxt_mem_cache_pool_create(&njs_vm_mem_cache_pool_proto, NULL,
-                                    NULL, 2 * nxt_pagesize(), 128, 512, 16);
-    if (nxt_slow_path(nmcp == NULL)) {
+    nmp = nxt_mp_create(&njs_vm_mp_proto, NULL, NULL, 2 * nxt_pagesize(),
+                        128, 512, 16);
+    if (nxt_slow_path(nmp == NULL)) {
         return NULL;
     }
 
-    nvm = nxt_mem_cache_zalign(nmcp, sizeof(njs_value_t), sizeof(njs_vm_t));
+    nvm = nxt_mp_zalign(nmp, sizeof(njs_value_t), sizeof(njs_vm_t));
 
     if (nxt_fast_path(nvm != NULL)) {
-        nvm->mem_cache_pool = nmcp;
+        nvm->mem_pool = nmp;
 
         nvm->shared = vm->shared;
         nvm->trace = vm->trace;
@@ -345,7 +347,7 @@ njs_vm_clone(njs_vm_t *vm, njs_external_ptr_t external)
 
         items = vm->external_objects->items;
         externals = nxt_array_create(items + 4, sizeof(void *),
-                                     &njs_array_mem_proto, nvm->mem_cache_pool);
+                                     &njs_array_mem_proto, nvm->mem_pool);
 
         if (nxt_slow_path(externals == NULL)) {
             return NULL;
@@ -380,7 +382,7 @@ njs_vm_clone(njs_vm_t *vm, njs_external_ptr_t external)
 
 fail:
 
-    nxt_mem_cache_pool_destroy(nmcp);
+    nxt_mp_destroy(nmp);
 
     return NULL;
 }
@@ -400,7 +402,7 @@ njs_vm_init(njs_vm_t *vm)
     size = NJS_GLOBAL_FRAME_SIZE + scope_size + NJS_FRAME_SPARE_SIZE;
     size = nxt_align_size(size, NJS_FRAME_SPARE_SIZE);
 
-    frame = nxt_mem_cache_align(vm->mem_cache_pool, sizeof(njs_value_t), size);
+    frame = nxt_mp_align(vm->mem_pool, sizeof(njs_value_t), size);
     if (nxt_slow_path(frame == NULL)) {
         return NXT_ERROR;
     }
@@ -436,7 +438,7 @@ njs_vm_init(njs_vm_t *vm)
 
     if (vm->debug != NULL) {
         backtrace = nxt_array_create(4, sizeof(njs_backtrace_entry_t),
-                                     &njs_array_mem_proto, vm->mem_cache_pool);
+                                     &njs_array_mem_proto, vm->mem_pool);
         if (nxt_slow_path(backtrace == NULL)) {
             return NXT_ERROR;
         }
@@ -456,6 +458,14 @@ nxt_int_t
 njs_vm_call(njs_vm_t *vm, njs_function_t *function, const njs_value_t *args,
     nxt_uint_t nargs)
 {
+    return  njs_vm_invoke(vm, function, args, nargs, NJS_INDEX_GLOBAL_RETVAL);
+}
+
+
+static nxt_int_t
+njs_vm_invoke(njs_vm_t *vm, njs_function_t *function, const njs_value_t *args,
+    nxt_uint_t nargs, njs_index_t retval)
+{
     u_char       *current;
     njs_ret_t    ret;
     njs_value_t  *this;
@@ -466,12 +476,15 @@ njs_vm_call(njs_vm_t *vm, njs_function_t *function, const njs_value_t *args,
 
     vm->current = (u_char *) njs_continuation_nexus;
 
-    ret = njs_function_activate(vm, function, this, args, nargs,
-                                NJS_INDEX_GLOBAL_RETVAL,
+    ret = njs_function_activate(vm, function, this, args, nargs, retval,
                                 sizeof(njs_vmcode_generic_t));
 
     if (nxt_fast_path(ret == NJS_APPLIED)) {
-        ret = njs_vm_start(vm);
+        ret = njs_vmcode_interpreter(vm);
+
+        if (ret == NJS_STOP) {
+            ret = NXT_OK;
+        }
     }
 
     vm->current = current;
@@ -486,7 +499,7 @@ njs_vm_add_event(njs_vm_t *vm, njs_function_t *function, nxt_uint_t once,
 {
     njs_event_t  *event;
 
-    event = nxt_mem_cache_alloc(vm->mem_cache_pool, sizeof(njs_event_t));
+    event = nxt_mp_alloc(vm->mem_pool, sizeof(njs_event_t));
     if (nxt_slow_path(event == NULL)) {
         return NULL;
     }
@@ -542,8 +555,7 @@ njs_vm_post_event(njs_vm_t *vm, njs_vm_event_t vm_event,
 
     if (nargs != 0 && !event->posted) {
         event->nargs = nargs;
-        event->args = nxt_mem_cache_alloc(vm->mem_cache_pool,
-                                          sizeof(njs_value_t) * nargs);
+        event->args = nxt_mp_alloc(vm->mem_pool, sizeof(njs_value_t) * nargs);
         if (nxt_slow_path(event->args == NULL)) {
             return NJS_ERROR;
         }
@@ -641,7 +653,7 @@ njs_vm_retval_set(njs_vm_t *vm, const njs_value_t *value)
 nxt_noinline void
 njs_vm_memory_error(njs_vm_t *vm)
 {
-    njs_set_memory_error(vm, &vm->retval);
+    njs_memory_error_set(vm, &vm->retval);
 }
 
 
@@ -709,7 +721,7 @@ njs_vm_object_alloc(njs_vm_t *vm, njs_value_t *retval, ...)
         }
 
         lhq.replace = 0;
-        lhq.pool = vm->mem_cache_pool;
+        lhq.pool = vm->mem_pool;
         lhq.proto = &njs_object_hash_proto;
 
         njs_string_get(name, &lhq.key);

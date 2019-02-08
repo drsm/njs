@@ -132,7 +132,7 @@ njs_crypto_object_value_alloc(njs_vm_t *vm, nxt_uint_t proto)
 {
     njs_object_value_t  *ov;
 
-    ov = nxt_mem_cache_alloc(vm->mem_cache_pool, sizeof(njs_object_value_t));
+    ov = nxt_mp_alloc(vm->mem_pool, sizeof(njs_object_value_t));
 
     if (nxt_fast_path(ov != NULL)) {
         nxt_lvlhsh_init(&ov->object.hash);
@@ -177,7 +177,7 @@ njs_crypto_create_hash(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         return NJS_ERROR;
     }
 
-    dgst = nxt_mem_cache_alloc(vm->mem_cache_pool, sizeof(njs_digest_t));
+    dgst = nxt_mp_alloc(vm->mem_pool, sizeof(njs_digest_t));
     if (nxt_slow_path(dgst == NULL)) {
         njs_memory_error(vm);
         return NJS_ERROR;
@@ -211,12 +211,12 @@ njs_hash_prototype_update(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     }
 
     if (nxt_slow_path(!njs_is_object_value(&args[0]))) {
-        njs_type_error(vm, "'this' is not an object_value");
+        njs_type_error(vm, "\"this\" is not an object_value");
         return NJS_ERROR;
     }
 
     if (nxt_slow_path(!njs_is_data(&args[0].data.u.object_value->value))) {
-        njs_type_error(vm, "value of 'this' is not a data type");
+        njs_type_error(vm, "value of \"this\" is not a data type");
         return NJS_ERROR;
     }
 
@@ -257,12 +257,12 @@ njs_hash_prototype_digest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     }
 
     if (nxt_slow_path(!njs_is_object_value(&args[0]))) {
-        njs_type_error(vm, "'this' is not an object_value");
+        njs_type_error(vm, "\"this\" is not an object_value");
         return NJS_ERROR;
     }
 
     if (nxt_slow_path(!njs_is_data(&args[0].data.u.object_value->value))) {
-        njs_type_error(vm, "value of 'this' is not a data type");
+        njs_type_error(vm, "value of \"this\" is not a data type");
         return NJS_ERROR;
     }
 
@@ -408,7 +408,7 @@ njs_crypto_create_hmac(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 
     njs_string_get(&args[2], &key);
 
-    ctx = nxt_mem_cache_alloc(vm->mem_cache_pool, sizeof(njs_hmac_t));
+    ctx = nxt_mp_alloc(vm->mem_pool, sizeof(njs_hmac_t));
     if (nxt_slow_path(ctx == NULL)) {
         njs_memory_error(vm);
         return NJS_ERROR;
@@ -470,12 +470,12 @@ njs_hmac_prototype_update(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     }
 
     if (nxt_slow_path(!njs_is_object_value(&args[0]))) {
-        njs_type_error(vm, "'this' is not an object_value");
+        njs_type_error(vm, "\"this\" is not an object_value");
         return NJS_ERROR;
     }
 
     if (nxt_slow_path(!njs_is_data(&args[0].data.u.object_value->value))) {
-        njs_type_error(vm, "value of 'this' is not a data type");
+        njs_type_error(vm, "value of \"this\" is not a data type");
         return NJS_ERROR;
     }
 
@@ -516,12 +516,12 @@ njs_hmac_prototype_digest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     }
 
     if (nxt_slow_path(!njs_is_object_value(&args[0]))) {
-        njs_type_error(vm, "'this' is not an object_value");
+        njs_type_error(vm, "\"this\" is not an object_value");
         return NJS_ERROR;
     }
 
     if (nxt_slow_path(!njs_is_data(&args[0].data.u.object_value->value))) {
-        njs_type_error(vm, "value of 'this' is not a data type");
+        njs_type_error(vm, "value of \"this\" is not a data type");
         return NJS_ERROR;
     }
 
@@ -691,8 +691,7 @@ njs_crypto_alg(njs_vm_t *vm, const nxt_str_t *name)
         }
     }
 
-    njs_type_error(vm, "not supported algorithm: '%.*s'",
-                   (int) name->length, name->start);
+    njs_type_error(vm, "not supported algorithm: \"%V\"", name);
 
     return NULL;
 }
@@ -709,8 +708,7 @@ njs_crypto_encoding(njs_vm_t *vm, const nxt_str_t *name)
         }
     }
 
-    njs_type_error(vm, "Unknown digest encoding: '%.*s'",
-                   (int) name->length, name->start);
+    njs_type_error(vm, "Unknown digest encoding: \"%V\"", name);
 
     return NULL;
 }

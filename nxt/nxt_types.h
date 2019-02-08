@@ -55,7 +55,20 @@ typedef unsigned __int128 nxt_uint128_t;
 #endif
 
 
+#if (NXT_INT_T_SIZE == 8)
+#define NXT_INT_T_LEN        NXT_INT64_T_LEN
+#define NXT_INT_T_HEXLEN     NXT_INT64_T_HEXLEN
+#define NXT_INT_T_MAX        NXT_INT64_T_MAX
+
+#else
+#define NXT_INT_T_LEN        NXT_INT32_T_LEN
+#define NXT_INT_T_HEXLEN     NXT_INT32_T_HEXLEN
+#define NXT_INT_T_MAX        NXT_INT32_T_MAX
+#endif
+
+
 typedef nxt_uint_t      nxt_bool_t;
+typedef int             nxt_err_t;
 
 
 /*
@@ -96,6 +109,14 @@ typedef time_t         nxt_time_t;
 
 
 typedef pid_t          nxt_pid_t;
+
+
+#define NXT_INT32_T_LEN      nxt_length("-2147483648")
+#define NXT_INT64_T_LEN      nxt_length("-9223372036854775808")
+
+#define NXT_DOUBLE_LEN       (1 + DBL_MAX_10_EXP)
+
+#define NXT_MAX_ERROR_STR    2048
 
 
 #endif /* _NXT_TYPES_H_INCLUDED_ */

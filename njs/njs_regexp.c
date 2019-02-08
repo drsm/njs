@@ -32,7 +32,7 @@ njs_ret_t
 njs_regexp_init(njs_vm_t *vm)
 {
     vm->regex_context = nxt_regex_context_create(njs_regexp_malloc,
-                                          njs_regexp_free, vm->mem_cache_pool);
+                                          njs_regexp_free, vm->mem_pool);
     if (nxt_slow_path(vm->regex_context == NULL)) {
         njs_memory_error(vm);
         return NXT_ERROR;
@@ -53,14 +53,14 @@ njs_regexp_init(njs_vm_t *vm)
 static void *
 njs_regexp_malloc(size_t size, void *memory_data)
 {
-    return nxt_mem_cache_alloc(memory_data, size);
+    return nxt_mp_alloc(memory_data, size);
 }
 
 
 static void
 njs_regexp_free(void *p, void *memory_data)
 {
-    nxt_mem_cache_free(memory_data, p);
+    nxt_mp_free(memory_data, p);
 }
 
 
@@ -88,8 +88,7 @@ njs_regexp_constructor(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 
         flags = njs_regexp_flags(&start, start + string.length, 1);
         if (nxt_slow_path(flags < 0)) {
-            njs_syntax_error(vm, "Invalid RegExp flags \"%.*s\"",
-                             (int) string.length, string.start);
+            njs_syntax_error(vm, "Invalid RegExp flags \"%V\"", &string);
             return NXT_ERROR;
         }
 
@@ -163,7 +162,7 @@ njs_regexp_literal(njs_vm_t *vm, njs_parser_t *parser, njs_value_t *value)
 
             if (nxt_slow_path(flags < 0)) {
                 njs_parser_syntax_error(vm, parser,
-                                        "Invalid RegExp flags \"%.*s\"",
+                                        "Invalid RegExp flags \"%*s\"",
                                         p - lexer->start, lexer->start);
 
                 return NJS_TOKEN_ILLEGAL;
@@ -183,8 +182,8 @@ njs_regexp_literal(njs_vm_t *vm, njs_parser_t *parser, njs_value_t *value)
         }
     }
 
-    njs_parser_syntax_error(vm, parser, "Unterminated RegExp \"%.*s\"",
-                            p - lexer->start - 1, lexer->start - 1);
+    njs_parser_syntax_error(vm, parser, "Unterminated RegExp \"%*s\"",
+                            p - (lexer->start - 1), lexer->start - 1);
 
     return NJS_TOKEN_ILLEGAL;
 }
@@ -269,9 +268,9 @@ njs_regexp_pattern_create(njs_vm_t *vm, u_char *start, size_t length,
     size += ((flags & NJS_REGEXP_IGNORE_CASE) != 0);
     size += ((flags & NJS_REGEXP_MULTILINE) != 0);
 
-    pattern = nxt_mem_cache_zalloc(vm->mem_cache_pool,
-                                   sizeof(njs_regexp_pattern_t)
-                                   + 1 + length + size + 1);
+    pattern = nxt_mp_zalloc(vm->mem_pool,
+							sizeof(njs_regexp_pattern_t)
+                            + 1 + length + size + 1);
     if (nxt_slow_path(pattern == NULL)) {
         njs_memory_error(vm);
         return NULL;
@@ -328,12 +327,12 @@ njs_regexp_pattern_create(njs_vm_t *vm, u_char *start, size_t length,
 
         if (nxt_slow_path((u_int) ret != pattern->ncaptures)) {
             njs_internal_error(vm, "regexp pattern compile failed");
-            nxt_mem_cache_free(vm->mem_cache_pool, pattern);
+            nxt_mp_free(vm->mem_pool, pattern);
             return NULL;
         }
 
     } else if (ret != NXT_DECLINED) {
-        nxt_mem_cache_free(vm->mem_cache_pool, pattern);
+        nxt_mp_free(vm->mem_pool, pattern);
         return NULL;
     }
 
@@ -379,7 +378,7 @@ njs_regexp_compile_trace_handler(nxt_trace_t *trace, nxt_trace_data_t *td,
     p = trace->handler(trace, td, start);
 
     if (vm->parser != NULL) {
-        njs_syntax_error(vm, "%s in %u", start, vm->parser->lexer->line);
+        njs_syntax_error(vm, "%s in %uD", start, vm->parser->lexer->line);
 
     } else {
         njs_syntax_error(vm, "%s", start);
@@ -430,7 +429,7 @@ njs_regexp_alloc(njs_vm_t *vm, njs_regexp_pattern_t *pattern)
 {
     njs_regexp_t  *regexp;
 
-    regexp = nxt_mem_cache_alloc(vm->mem_cache_pool, sizeof(njs_regexp_t));
+    regexp = nxt_mp_alloc(vm->mem_pool, sizeof(njs_regexp_t));
 
     if (nxt_fast_path(regexp != NULL)) {
         nxt_lvlhsh_init(&regexp->object.hash);
@@ -541,7 +540,7 @@ njs_regexp_prototype_to_string(njs_vm_t *vm, njs_value_t *args,
         return njs_regexp_to_string(vm, &vm->retval, &args[0]);
     }
 
-    njs_type_error(vm, "'this' argument is not a regexp");
+    njs_type_error(vm, "\"this\" argument is not a regexp");
 
     return NXT_ERROR;
 }
@@ -578,7 +577,7 @@ njs_regexp_prototype_test(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     njs_regexp_pattern_t  *pattern;
 
     if (!njs_is_regexp(&args[0])) {
-        njs_type_error(vm, "'this' argument is not a regexp");
+        njs_type_error(vm, "\"this\" argument is not a regexp");
         return NXT_ERROR;
     }
 
@@ -628,7 +627,7 @@ njs_regexp_prototype_exec(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     nxt_regex_match_data_t  *match_data;
 
     if (!njs_is_regexp(&args[0])) {
-        njs_type_error(vm, "'this' argument is not a regexp");
+        njs_type_error(vm, "\"this\" argument is not a regexp");
         return NXT_ERROR;
     }
 
@@ -752,7 +751,7 @@ njs_regexp_exec_result(njs_vm_t *vm, njs_regexp_t *regexp, njs_utf8_t utf8,
     lhq.key = nxt_string_value("index");
     lhq.replace = 0;
     lhq.value = prop;
-    lhq.pool = vm->mem_cache_pool;
+    lhq.pool = vm->mem_pool;
     lhq.proto = &njs_object_hash_proto;
 
     ret = nxt_lvlhsh_insert(&array->object.hash, &lhq);

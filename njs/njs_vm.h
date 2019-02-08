@@ -13,7 +13,7 @@
 #include <nxt_regex.h>
 #include <nxt_random.h>
 #include <nxt_djb_hash.h>
-#include <nxt_mem_cache_pool.h>
+#include <nxt_mp.h>
 
 
 #define NJS_MAX_STACK_SIZE       (16 * 1024 * 1024)
@@ -352,8 +352,9 @@ typedef union {
 
 
 typedef struct {
-    nxt_str_t                       name;
-    uint32_t                        line;
+    nxt_str_t                         name;
+    nxt_str_t                         file;
+    uint32_t                          line;
 } njs_backtrace_entry_t;
 
 
@@ -1012,6 +1013,7 @@ typedef struct {
 
 typedef struct {
     uint32_t                  line;
+    nxt_str_t                 file;
     nxt_str_t                 name;
     njs_function_lambda_t     *lambda;
 } njs_function_debug_t;
@@ -1053,7 +1055,7 @@ struct njs_vm_s {
     njs_object_prototype_t   prototypes[NJS_PROTOTYPE_MAX];
     njs_function_t           constructors[NJS_CONSTRUCTOR_MAX];
 
-    nxt_mem_cache_pool_t     *mem_cache_pool;
+    nxt_mp_t                 *mem_pool;
 
     njs_value_t              *global_scope;
     size_t                   scope_size;

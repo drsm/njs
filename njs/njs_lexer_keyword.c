@@ -88,10 +88,10 @@ static const njs_keyword_t  njs_keywords[] = {
     { nxt_string("encodeURIComponent"),  NJS_TOKEN_ENCODE_URI_COMPONENT, 0 },
     { nxt_string("decodeURI"),     NJS_TOKEN_DECODE_URI, 0 },
     { nxt_string("decodeURIComponent"),  NJS_TOKEN_DECODE_URI_COMPONENT, 0 },
-    { nxt_string("require"),      NJS_TOKEN_REQUIRE, 0 },
-    { nxt_string("setTimeout"),   NJS_TOKEN_SET_TIMEOUT, 0 },
-    { nxt_string("setImmediate"), NJS_TOKEN_SET_IMMEDIATE, 0 },
-    { nxt_string("clearTimeout"), NJS_TOKEN_CLEAR_TIMEOUT, 0 },
+    { nxt_string("require"),       NJS_TOKEN_REQUIRE, 0 },
+    { nxt_string("setTimeout"),    NJS_TOKEN_SET_TIMEOUT, 0 },
+    { nxt_string("setImmediate"),  NJS_TOKEN_SET_IMMEDIATE, 0 },
+    { nxt_string("clearTimeout"),  NJS_TOKEN_CLEAR_TIMEOUT, 0 },
 
     /* Reserved words. */
 
@@ -156,7 +156,7 @@ const nxt_lvlhsh_proto_t  njs_keyword_hash_proto
 
 
 nxt_int_t
-njs_lexer_keywords_init(nxt_mem_cache_pool_t *mcp, nxt_lvlhsh_t *hash)
+njs_lexer_keywords_init(nxt_mp_t *mcp, nxt_lvlhsh_t *hash)
 {
     nxt_uint_t           n;
     nxt_lvlhsh_query_t   lhq;

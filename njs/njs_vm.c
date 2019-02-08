@@ -236,7 +236,7 @@ start:
 
             if (frame->native.size != 0) {
                 vm->stack_size -= frame->native.size;
-                nxt_mem_cache_free(vm->mem_cache_pool, frame);
+                nxt_mp_free(vm->mem_pool, frame);
             }
         }
     }
@@ -289,11 +289,11 @@ njs_value_release(njs_vm_t *vm, njs_value_t *value)
                     if ((u_char *) string + sizeof(njs_string_t)
                         != string->start)
                     {
-                        nxt_memcache_pool_free(vm->mem_cache_pool,
+                        nxt_memcache_pool_free(vm->mem_pool,
                                                string->start);
                     }
 
-                    nxt_memcache_pool_free(vm->mem_cache_pool, string);
+                    nxt_memcache_pool_free(vm->mem_pool, string);
                 }
 #endif
             }
@@ -377,7 +377,7 @@ njs_vmcode_function(njs_vm_t *vm, njs_value_t *invld1, njs_value_t *invld2)
 
     size = sizeof(njs_function_t) + nesting * sizeof(njs_closure_t *);
 
-    function = nxt_mem_cache_zalloc(vm->mem_cache_pool, size);
+    function = nxt_mp_zalloc(vm->mem_pool, size);
     if (nxt_slow_path(function == NULL)) {
         njs_memory_error(vm);
         return NXT_ERROR;
@@ -555,7 +555,7 @@ njs_vmcode_property_set(njs_vm_t *vm, njs_value_t *object,
             break;
 
         default:
-            njs_internal_error(vm, "unexpected property type '%s' "
+            njs_internal_error(vm, "unexpected property type \"%s\" "
                                "while setting",
                                njs_prop_type_string(prop->type));
 
@@ -566,9 +566,8 @@ njs_vmcode_property_set(njs_vm_t *vm, njs_value_t *object,
 
     case NXT_DECLINED:
         if (nxt_slow_path(!object->data.u.object->extensible)) {
-            njs_type_error(vm, "Cannot add property '%.*s', "
-                           "object is not extensible", pq.lhq.key.length,
-                           pq.lhq.key.start);
+            njs_type_error(vm, "Cannot add property \"%V\", "
+                           "object is not extensible", &pq.lhq.key);
             return NXT_ERROR;
         }
 
@@ -592,7 +591,7 @@ njs_vmcode_property_set(njs_vm_t *vm, njs_value_t *object,
 
         pq.lhq.replace = 0;
         pq.lhq.value = prop;
-        pq.lhq.pool = vm->mem_cache_pool;
+        pq.lhq.pool = vm->mem_pool;
 
         ret = nxt_lvlhsh_insert(&object->data.u.object->hash, &pq.lhq);
         if (nxt_slow_path(ret != NXT_OK)) {
@@ -610,9 +609,8 @@ njs_vmcode_property_set(njs_vm_t *vm, njs_value_t *object,
     }
 
     if (nxt_slow_path(!prop->writable)) {
-        njs_type_error(vm, "Cannot assign to read-only property '%.*s' of %s",
-                       pq.lhq.key.length, pq.lhq.key.start,
-                       njs_type_string(object->type));
+        njs_type_error(vm, "Cannot assign to read-only property \"%V\" of %s",
+                       &pq.lhq.key, njs_type_string(object->type));
         return NXT_ERROR;
     }
 
@@ -714,7 +712,7 @@ njs_vmcode_property_delete(njs_vm_t *vm, njs_value_t *object,
             break;
 
         default:
-            njs_internal_error(vm, "unexpected property type '%s' "
+            njs_internal_error(vm, "unexpected property type \"%s\" "
                                "while deleting",
                                njs_prop_type_string(prop->type));
 
@@ -722,9 +720,8 @@ njs_vmcode_property_delete(njs_vm_t *vm, njs_value_t *object,
         }
 
         if (nxt_slow_path(!prop->configurable)) {
-            njs_type_error(vm, "Cannot delete property '%.*s' of %s",
-                           pq.lhq.key.length, pq.lhq.key.start,
-                           njs_type_string(object->type));
+            njs_type_error(vm, "Cannot delete property \"%V\" of %s",
+                           &pq.lhq.key, njs_type_string(object->type));
             return NXT_ERROR;
         }
 
@@ -765,8 +762,7 @@ njs_vmcode_property_foreach(njs_vm_t *vm, njs_value_t *object,
     njs_vmcode_prop_foreach_t  *code;
 
     if (njs_is_object(object)) {
-        next = nxt_mem_cache_alloc(vm->mem_cache_pool,
-                                   sizeof(njs_property_next_t));
+        next = nxt_mp_alloc(vm->mem_pool, sizeof(njs_property_next_t));
         if (nxt_slow_path(next == NULL)) {
             njs_memory_error(vm);
             return NXT_ERROR;
@@ -849,7 +845,7 @@ njs_vmcode_property_next(njs_vm_t *vm, njs_value_t *object, njs_value_t *value)
             }
         }
 
-        nxt_mem_cache_free(vm->mem_cache_pool, next);
+        nxt_mp_free(vm->mem_pool, next);
 
     } else if (njs_is_external(object)) {
         ext_proto = object->external.proto;
@@ -1972,7 +1968,7 @@ njs_vmcode_method_frame(njs_vm_t *vm, njs_value_t *object, njs_value_t *name)
             break;
 
         default:
-            njs_internal_error(vm, "unexpected property type '%s' "
+            njs_internal_error(vm, "unexpected property type \"%s\" "
                                "while getting method",
                                njs_prop_type_string(prop->type));
 
@@ -1995,8 +1991,7 @@ njs_vmcode_method_frame(njs_vm_t *vm, njs_value_t *object, njs_value_t *name)
 
     if (value == NULL || !njs_is_function(value)) {
         njs_string_get(name, &string);
-        njs_type_error(vm, "'%.*s' is not a function", (int) string.length,
-                       string.start);
+        njs_type_error(vm, "\"%V\" is not a function", &string);
         return NXT_ERROR;
     }
 
@@ -2343,7 +2338,7 @@ njs_vmcode_try_start(njs_vm_t *vm, njs_value_t *exception_value,
     njs_vmcode_try_start_t  *try_start;
 
     if (vm->top_frame->exception.catch != NULL) {
-        e = nxt_mem_cache_alloc(vm->mem_cache_pool, sizeof(njs_exception_t));
+        e = nxt_mp_alloc(vm->mem_pool, sizeof(njs_exception_t));
         if (nxt_slow_path(e == NULL)) {
             njs_memory_error(vm);
             return NXT_ERROR;
@@ -2436,7 +2431,7 @@ njs_vmcode_try_end(njs_vm_t *vm, njs_value_t *invld, njs_value_t *offset)
 
     } else {
         vm->top_frame->exception = *e;
-        nxt_mem_cache_free(vm->mem_cache_pool, e);
+        nxt_mp_free(vm->mem_pool, e);
     }
 
     return (njs_ret_t) offset;
@@ -3025,7 +3020,7 @@ njs_value_property(njs_vm_t *vm, njs_value_t *value,
             break;
 
         default:
-            njs_internal_error(vm, "unexpected property type '%s' "
+            njs_internal_error(vm, "unexpected property type \"%s\" "
                                "while getting",
                                njs_prop_type_string(prop->type));
 
@@ -3054,7 +3049,7 @@ njs_ret_t
 njs_vm_value_to_ext_string(njs_vm_t *vm, nxt_str_t *dst, const njs_value_t *src,
     nxt_uint_t handle_exception)
 {
-    u_char                 *p, *start;
+    u_char                 *p, *start, *end;
     size_t                 len, size, count;
     njs_ret_t              ret;
     nxt_uint_t             i, exception;
@@ -3104,7 +3099,7 @@ again:
             size = value.short_string.size;
 
             if (size != NJS_STRING_LONG) {
-                start = nxt_mem_cache_alloc(vm->mem_cache_pool, size);
+                start = nxt_mp_alloc(vm->mem_pool, size);
                 if (nxt_slow_path(start == NULL)) {
                     njs_memory_error(vm);
                     return NXT_ERROR;
@@ -3132,38 +3127,41 @@ again:
                 be = backtrace->start;
 
                 for (i = 0; i < backtrace->items; i++) {
-                    if (i != 0 && prev->name.start == be[i].name.start
-                        && prev->line == be[i].line)
+                    if (i != 0 && prev->name.start == be->name.start
+                        && prev->line == be->line)
                     {
                         count++;
 
                     } else {
 
                         if (count != 0) {
-                            len += sizeof("      repeats  times\n") + 10;
+                            len += nxt_length("      repeats  times\n")
+                                   + NXT_INT_T_LEN;
                             count = 0;
                         }
 
-                        if (be[i].line != 0) {
-                            len += sizeof("    at  (:)\n") + 10
-                                   + be[i].name.length;
+                        len += be->name.length + nxt_length("    at  ()\n");
+
+                        if (be->line != 0) {
+                            len += be->file.length + NXT_INT_T_LEN + 1;
 
                         } else {
-                            len += sizeof("    at  (native)\n")
-                                   + be[i].name.length;
+                            len += nxt_length("native");
                         }
                     }
 
-                    prev = &be[i];
+                    prev = be;
+                    be++;
                 }
 
-                p = nxt_mem_cache_alloc(vm->mem_cache_pool, len);
+                p = nxt_mp_alloc(vm->mem_pool, len);
                 if (p == NULL) {
                     njs_memory_error(vm);
                     return NXT_ERROR;
                 }
 
                 start = p;
+                end = start + len;
 
                 p = nxt_cpymem(p, dst->start, dst->length);
                 *p++ = '\n';
@@ -3171,32 +3169,34 @@ again:
                 count = 0;
                 prev = NULL;
 
+                be = backtrace->start;
+
                 for (i = 0; i < backtrace->items; i++) {
-                    if (i != 0 && prev->name.start == be[i].name.start
-                        && prev->line == be[i].line)
+                    if (i != 0 && prev->name.start == be->name.start
+                        && prev->line == be->line)
                     {
                         count++;
 
                     } else {
                         if (count != 0) {
-                            p += sprintf((char *) p,
-                                         "      repeats %zu times\n", count);
-                            count =0;
+                            p = nxt_sprintf(p, end, "      repeats %uz times\n",
+                                            count);
+                            count = 0;
                         }
 
-                        if (be[i].line != 0) {
-                            p += sprintf((char *) p, "    at %.*s (:%u)\n",
-                                         (int) be[i].name.length,
-                                         be[i].name.start, be[i].line);
+                        p = nxt_sprintf(p, end, "    at %V ", &be->name);
+
+                        if (be->line != 0) {
+                            p = nxt_sprintf(p, end, "(%V:%uD)\n", &be->file,
+                                            be->line);
 
                         } else {
-                            p += sprintf((char *) p, "    at %.*s (native)\n",
-                                         (int) be[i].name.length,
-                                         be[i].name.start);
+                            p = nxt_sprintf(p, end, "(native)\n");
                         }
                     }
 
-                    prev = &be[i];
+                    prev = be;
+                    be++;
                 }
 
                 dst->start = start;
@@ -3363,7 +3363,7 @@ njs_value_error_set(njs_vm_t *vm, njs_value_t *value, const char *fmt, ...)
 
 memory_error:
 
-    njs_set_memory_error(vm, value);
+    njs_memory_error_set(vm, value);
 }
 
 
@@ -3513,7 +3513,7 @@ njs_vm_add_backtrace_entry(njs_vm_t *vm, njs_frame_t *frame)
     native_frame = &frame->native;
     function = native_frame->function;
 
-    be = nxt_array_add(vm->backtrace, &njs_array_mem_proto, vm->mem_cache_pool);
+    be = nxt_array_add(vm->backtrace, &njs_array_mem_proto, vm->mem_pool);
     if (nxt_slow_path(be == NULL)) {
         return NXT_ERROR;
     }
@@ -3554,6 +3554,7 @@ njs_vm_add_backtrace_entry(njs_vm_t *vm, njs_frame_t *frame)
                 be->name = entry_anonymous;
             }
 
+            be->file = debug_entry[i].file;
             be->line = debug_entry[i].line;
 
             return NXT_OK;
@@ -3631,12 +3632,12 @@ njs_debug(njs_index_t index, njs_value_t *value)
 void *
 njs_lvlhsh_alloc(void *data, size_t size, nxt_uint_t nalloc)
 {
-    return nxt_mem_cache_align(data, size, size);
+    return nxt_mp_align(data, size, size);
 }
 
 
 void
 njs_lvlhsh_free(void *data, void *p, size_t size)
 {
-    nxt_mem_cache_free(data, p);
+    nxt_mp_free(data, p);
 }

@@ -71,6 +71,8 @@ static njs_ret_t ngx_http_js_ext_get_header_out(njs_vm_t *vm,
     njs_value_t *value, void *obj, uintptr_t data);
 static njs_ret_t ngx_http_js_ext_set_header_out(njs_vm_t *vm, void *obj,
     uintptr_t data, nxt_str_t *value);
+static njs_ret_t ngx_http_js_ext_delete_header_out(njs_vm_t *vm, void *obj,
+    uintptr_t data, nxt_bool_t delete);
 static njs_ret_t ngx_http_js_ext_foreach_header_out(njs_vm_t *vm, void *obj,
     void *next); /*FIXME*/
 static njs_ret_t ngx_http_js_ext_get_status(njs_vm_t *vm, njs_value_t *value,
@@ -344,7 +346,7 @@ static njs_external_t  ngx_http_js_ext_request[] = {
       0,
       ngx_http_js_ext_get_header_out,
       ngx_http_js_ext_set_header_out,
-      NULL,
+      ngx_http_js_ext_delete_header_out,
       ngx_http_js_ext_foreach_header_out,
       ngx_http_js_ext_next_header,
       NULL,
@@ -858,6 +860,10 @@ ngx_http_js_ext_next_header(njs_vm_t *vm, njs_value_t *value, void *obj,
         header = entry->part->elts;
         h = &header[entry->item++];
 
+        if (h->hash == 0) {
+            continue;
+        }
+
         return njs_string_create(vm, value, h->key.data, h->key.len, 0);
     }
 
@@ -934,10 +940,27 @@ ngx_http_js_ext_set_header_out(njs_vm_t *vm, void *obj, uintptr_t data,
     r = (ngx_http_request_t *) obj;
     v = (nxt_str_t *) data;
 
+    if (v->length == nxt_length("Content-Type")
+        && ngx_strncasecmp(v->start, (u_char *) "Content-Type",
+                           v->length) == 0)
+    {
+        r->headers_out.content_type.len = value->length;
+        r->headers_out.content_type_len = r->headers_out.content_type.len;
+        r->headers_out.content_type.data = value->start;
+        r->headers_out.content_type_lowcase = NULL;
+
+        return NJS_OK;
+    }
+
     h = ngx_http_js_get_header(&r->headers_out.headers.part, v->start,
                                v->length);
 
-    if (h == NULL || h->hash == 0) {
+    if (h != NULL && value->length == 0) {
+        h->hash = 0;
+        h = NULL;
+    }
+
+    if (h == NULL && value->length != 0) {
         h = ngx_list_push(&r->headers_out.headers);
         if (h == NULL) {
             return NJS_ERROR;
@@ -952,33 +975,61 @@ ngx_http_js_ext_set_header_out(njs_vm_t *vm, void *obj, uintptr_t data,
 
         h->key.data = p;
         h->key.len = v->length;
-        h->hash = 1;
     }
 
-    p = ngx_pnalloc(r->pool, value->length);
-    if (p == NULL) {
-        return NJS_ERROR;
-    }
-
-    ngx_memcpy(p, value->start, value->length);
-
-    h->value.data = p;
-    h->value.len = value->length;
-
-    if (h->key.len == nxt_length("Content-Length")
-        && ngx_strncasecmp(h->key.data, (u_char *) "Content-Length",
-                           nxt_length("Content-Length")) == 0)
-    {
-        n = ngx_atoi(value->start, value->length);
-        if (n == NGX_ERROR) {
+    if (h != NULL) {
+        p = ngx_pnalloc(r->pool, value->length);
+        if (p == NULL) {
             return NJS_ERROR;
         }
 
-        r->headers_out.content_length_n = n;
-        r->headers_out.content_length = h;
+        ngx_memcpy(p, value->start, value->length);
+
+        h->value.data = p;
+        h->value.len = value->length;
+        h->hash = 1;
+    }
+
+    if (v->length == nxt_length("Content-Encoding")
+        && ngx_strncasecmp(v->start, (u_char *) "Content-Encoding",
+                           v->length) == 0)
+    {
+        r->headers_out.content_encoding = h;
+    }
+
+    if (v->length == nxt_length("Content-Length")
+        && ngx_strncasecmp(v->start, (u_char *) "Content-Length",
+                           v->length) == 0)
+    {
+        if (h != NULL) {
+            n = ngx_atoi(value->start, value->length);
+            if (n == NGX_ERROR) {
+                h->hash = 0;
+                njs_vm_error(vm, "failed converting argument to integer");
+                return NJS_ERROR;
+            }
+
+            r->headers_out.content_length = h;
+            r->headers_out.content_length_n = n;
+
+        } else {
+            ngx_http_clear_content_length(r);
+        }
     }
 
     return NJS_OK;
+}
+
+
+static njs_ret_t
+ngx_http_js_ext_delete_header_out(njs_vm_t *vm, void *obj, uintptr_t data,
+    nxt_bool_t unused)
+{
+    nxt_str_t  value;
+
+    value = nxt_string_value("");
+
+    return ngx_http_js_ext_set_header_out(vm, obj, data, &value);
 }
 
 
@@ -1032,6 +1083,10 @@ ngx_http_js_ext_send_header(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 
     r = njs_vm_external(vm, njs_arg(args, nargs, 0));
     if (nxt_slow_path(r == NULL)) {
+        return NJS_ERROR;
+    }
+
+    if (ngx_http_set_content_type(r) != NGX_OK) {
         return NJS_ERROR;
     }
 
@@ -2111,6 +2166,10 @@ ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     options.backtrace = 1;
     options.ops = &ngx_http_js_ops;
+
+    file = value[1];
+    options.file.start = file.data;
+    options.file.length = file.len;
 
     jmcf->vm = njs_vm_create(&options);
     if (jmcf->vm == NULL) {

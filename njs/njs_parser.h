@@ -221,6 +221,8 @@ typedef struct {
 
     nxt_lvlhsh_t                    keywords_hash;
 
+    nxt_str_t                       file;
+
     u_char                          *start;
     u_char                          *prev_start;
     u_char                          *end;
@@ -232,7 +234,7 @@ typedef struct {
 
 
 struct njs_parser_scope_s {
-    njs_parser_node_t               *node;
+    njs_parser_node_t               *top;
 
     nxt_queue_link_t                link;
     nxt_queue_t                     nested;
@@ -246,6 +248,8 @@ struct njs_parser_scope_s {
 
     nxt_array_t                     *values[2];  /* Array of njs_value_t. */
     njs_index_t                     next_index[2];
+
+    nxt_str_t                       file;
 
     njs_scope_t                     type:8;
     uint8_t                         nesting;     /* 4 bits */
@@ -283,10 +287,6 @@ struct njs_parser_node_s {
 };
 
 
-#define njs_parser_node_alloc(vm)                                             \
-    nxt_mem_cache_zalloc((vm)->mem_cache_pool, sizeof(njs_parser_node_t))
-
-
 struct njs_parser_s {
     njs_lexer_t                     *lexer;
     njs_parser_node_t               *node;
@@ -303,8 +303,7 @@ typedef struct {
 
 njs_token_t njs_lexer_token(njs_lexer_t *lexer);
 void njs_lexer_rollback(njs_lexer_t *lexer);
-nxt_int_t njs_lexer_keywords_init(nxt_mem_cache_pool_t *mcp,
-    nxt_lvlhsh_t *hash);
+nxt_int_t njs_lexer_keywords_init(nxt_mp_t *mcp, nxt_lvlhsh_t *hash);
 njs_token_t njs_lexer_keyword(njs_lexer_t *lexer);
 
 njs_value_t *njs_parser_external(njs_vm_t *vm, njs_parser_t *parser);
@@ -332,10 +331,30 @@ njs_index_t njs_variable_index(njs_vm_t *vm, njs_parser_node_t *node);
 nxt_bool_t njs_parser_has_side_effect(njs_parser_node_t *node);
 u_char *njs_parser_trace_handler(nxt_trace_t *trace, nxt_trace_data_t *td,
     u_char *start);
-void njs_parser_syntax_error(njs_vm_t *vm, njs_parser_t *parser,
-    const char* fmt, ...);
-void njs_parser_ref_error(njs_vm_t *vm, njs_parser_t *parser, const char* fmt,
-    ...);
+void njs_parser_error(njs_vm_t *vm, njs_parser_t *parser,
+    njs_value_type_t type, const char *fmt, ...);
+
+#define njs_parser_syntax_error(vm, parser, fmt, ...)  \
+    njs_parser_error(vm, parser, NJS_OBJECT_SYNTAX_ERROR, fmt, ##__VA_ARGS__)
+
+#define njs_parser_ref_error(vm, parser, fmt, ...)  \
+    njs_parser_error(vm, parser, NJS_OBJECT_REF_ERROR, fmt, ##__VA_ARGS__)
+
+
+nxt_inline njs_parser_node_t *
+njs_parser_node_new(njs_vm_t *vm, njs_parser_t *parser, njs_token_t token)
+{
+    njs_parser_node_t  *node;
+
+    node = nxt_mp_zalloc(vm->mem_pool, sizeof(njs_parser_node_t));
+
+    if (nxt_fast_path(node != NULL)) {
+        node->token = token;
+        node->scope = parser->scope;
+    }
+
+    return node;
+}
 
 
 extern const nxt_lvlhsh_proto_t  njs_keyword_hash_proto;

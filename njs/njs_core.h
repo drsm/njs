@@ -25,8 +25,10 @@
 #include <nxt_lvlhsh.h>
 #include <nxt_random.h>
 #include <nxt_time.h>
+#include <nxt_file.h>
 #include <nxt_malloc.h>
-#include <nxt_mem_cache_pool.h>
+#include <nxt_mp.h>
+#include <nxt_sprintf.h>
 
 #include <njs.h>
 #include <njs_vm.h>

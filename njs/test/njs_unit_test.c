@@ -28,6 +28,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("1}"),
       nxt_string("SyntaxError: Unexpected token \"}\" in 1") },
 
+    { nxt_string("/***/1/*\n**/"),
+      nxt_string("1") },
+
     /* Variable declarations. */
 
     { nxt_string("var x"),
@@ -548,7 +551,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: argument must be a byte string") },
 
     { nxt_string("'A'.toBytes().toString('latin1')"),
-      nxt_string("TypeError: Unknown encoding: 'latin1'") },
+      nxt_string("TypeError: Unknown encoding: \"latin1\"") },
 
     { nxt_string("'ABCD'.toBytes().toString('hex')"),
       nxt_string("41424344") },
@@ -2621,7 +2624,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("undefined") },
 
     { nxt_string("var a = {}; a.b.c"),
-      nxt_string("TypeError: cannot get property 'c' of undefined") },
+      nxt_string("TypeError: cannot get property \"c\" of undefined") },
 
     { nxt_string("'a'[0]"),
       nxt_string("a") },
@@ -2669,10 +2672,10 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("3") },
 
     { nxt_string("var a = undefined; a.b++; a.b"),
-      nxt_string("TypeError: cannot get property 'b' of undefined") },
+      nxt_string("TypeError: cannot get property \"b\" of undefined") },
 
     { nxt_string("var a = null; a.b++; a.b"),
-      nxt_string("TypeError: cannot get property 'b' of undefined") },
+      nxt_string("TypeError: cannot get property \"b\" of undefined") },
 
     { nxt_string("var a = true; a.b++; a.b"),
       nxt_string("TypeError: property set on primitive boolean type") },
@@ -2735,7 +2738,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("SyntaxError: Unexpected token \";\" in 1") },
 
     { nxt_string("var x = { a: 1, b: x.a }"),
-      nxt_string("TypeError: cannot get property 'a' of undefined") },
+      nxt_string("TypeError: cannot get property \"a\" of undefined") },
 
     { nxt_string("var a = { b: 2 }; a.b += 1"),
       nxt_string("3") },
@@ -2813,6 +2816,18 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("var o = Object.create({a:1}); o.a = 2; delete o.a; o.a"),
       nxt_string("1") },
 
+    { nxt_string("njs.dump({break:1,3:2,'a':4,\"b\":2,true:1,null:0})"),
+      nxt_string("{break:1,3:2,a:4,b:2,true:1,null:0}") },
+
+    { nxt_string("var o1 = {a:1,b:2}, o2 = {c:3}; o1.a + o2.c"),
+      nxt_string("4") },
+
+    { nxt_string("({[]:1})"),
+      nxt_string("SyntaxError: Unexpected token \"[\" in 1") },
+
+    { nxt_string("({'AB\n\\cd':1})['AB\n\\cd']"),
+      nxt_string("1") },
+
     /* Inheritance. */
 
     { nxt_string("function Foo() {this.bar = 10;}; Foo.prototype.bar = 42; "
@@ -2826,10 +2841,10 @@ static njs_unit_test_t  njs_test[] =
     /* Math object is immutable. */
 
     { nxt_string("delete Math.max"),
-      nxt_string("TypeError: Cannot delete property 'max' of object") },
+      nxt_string("TypeError: Cannot delete property \"max\" of object") },
 
     { nxt_string("Math.E = 1"),
-      nxt_string("TypeError: Cannot assign to read-only property 'E' of object") },
+      nxt_string("TypeError: Cannot assign to read-only property \"E\" of object") },
 
     { nxt_string("var o = { 'a': 1, 'b': 2 }; var i; "
                  "for (i in o) { delete o.a; delete o.b; }; njs.dump(o)"),
@@ -4362,9 +4377,9 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("12") },
 
     { nxt_string("var p = $r3.props; p.a = 1"),
-      nxt_string("TypeError: Cannot assign to read-only property 'a' of external") },
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of external") },
     { nxt_string("var p = $r3.props; delete p.a"),
-      nxt_string("TypeError: Cannot delete property 'a' of external") },
+      nxt_string("TypeError: Cannot delete property \"a\" of external") },
 
     { nxt_string("$r.vars.p + $r2.vars.q + $r3.vars.k"),
       nxt_string("pvalqvalkval") },
@@ -4397,10 +4412,10 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("b") },
 
     { nxt_string("$r3.vars.error = 1"),
-      nxt_string("Error: cannot set 'error' prop") },
+      nxt_string("Error: cannot set \"error\" prop") },
 
     { nxt_string("delete $r3.vars.error"),
-      nxt_string("Error: cannot delete 'error' prop") },
+      nxt_string("Error: cannot delete \"error\" prop") },
 
     { nxt_string("delete $r3.vars.e"),
       nxt_string("true") },
@@ -4409,10 +4424,10 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("kval") },
 
     { nxt_string("$r3.consts.k = 1"),
-      nxt_string("TypeError: Cannot assign to read-only property 'k' of external") },
+      nxt_string("TypeError: Cannot assign to read-only property \"k\" of external") },
 
     { nxt_string("delete $r3.consts.k"),
-      nxt_string("TypeError: Cannot delete property 'k' of external") },
+      nxt_string("TypeError: Cannot delete property \"k\" of external") },
 
     { nxt_string("delete $r3.vars.p; $r3.vars.p"),
       nxt_string("undefined") },
@@ -4461,10 +4476,10 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("delete $r.uri"),
-      nxt_string("TypeError: Cannot delete property 'uri' of external") },
+      nxt_string("TypeError: Cannot delete property \"uri\" of external") },
 
     { nxt_string("delete $r.one"),
-      nxt_string("TypeError: Cannot delete property 'one' of external") },
+      nxt_string("TypeError: Cannot delete property \"one\" of external") },
 
     { nxt_string("$r.some_method.call($r, 'YES')"),
       nxt_string("АБВ") },
@@ -4485,7 +4500,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("undefined") },
 
     { nxt_string("$r.error = 'OK'"),
-      nxt_string("TypeError: Cannot assign to read-only property 'error' of external") },
+      nxt_string("TypeError: Cannot assign to read-only property \"error\" of external") },
 
     { nxt_string("var a = { toString: function() { return 1 } }; a"),
       nxt_string("1") },
@@ -5311,7 +5326,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("0") },
 
     { nxt_string("function f() { }; f.length = 1"),
-      nxt_string("TypeError: Cannot assign to read-only property 'length' of function") },
+      nxt_string("TypeError: Cannot assign to read-only property \"length\" of function") },
 
     { nxt_string("function f(...rest) { }; f.length"),
       nxt_string("0") },
@@ -5393,7 +5408,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: number is not a function") },
 
     { nxt_string("var o = {a:1}; o.a()"),
-      nxt_string("TypeError: 'a' is not a function") },
+      nxt_string("TypeError: \"a\" is not a function") },
 
     { nxt_string("(function(){})()"),
       nxt_string("undefined") },
@@ -5766,7 +5781,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("[object Function]") },
 
     { nxt_string("''.concat.call()"),
-      nxt_string("TypeError: 'this' argument is null or undefined") },
+      nxt_string("TypeError: \"this\" argument is null or undefined") },
 
     { nxt_string("''.concat.call('a', 'b', 'c')"),
       nxt_string("abc") },
@@ -5781,7 +5796,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("ab,cd") },
 
     { nxt_string("''.concat.apply()"),
-      nxt_string("TypeError: 'this' argument is null or undefined") },
+      nxt_string("TypeError: \"this\" argument is null or undefined") },
 
     { nxt_string("''.concat.apply('a')"),
       nxt_string("a") },
@@ -5852,7 +5867,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("01") },
 
     { nxt_string("var concat = ''.concat; concat(1,2,3)"),
-      nxt_string("TypeError: 'this' argument is null or undefined") },
+      nxt_string("TypeError: \"this\" argument is null or undefined") },
 
     { nxt_string("var concat = ''.concat; concat.call(1,2,3)"),
       nxt_string("123") },
@@ -6061,10 +6076,10 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("1") },
 
     { nxt_string("(function(){return arguments.callee;})()"),
-      nxt_string("TypeError: 'caller', 'callee' properties may not be accessed") },
+      nxt_string("TypeError: \"caller\", \"callee\" properties may not be accessed") },
 
     { nxt_string("(function(){return arguments.caller;})()"),
-      nxt_string("TypeError: 'caller', 'callee' properties may not be accessed") },
+      nxt_string("TypeError: \"caller\", \"callee\" properties may not be accessed") },
 
     { nxt_string("function sum() { var args = Array.prototype.slice.call(arguments); "
                  "return args.reduce(function(prev, curr) {return prev + curr})};"
@@ -6270,7 +6285,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("SyntaxError: Invalid RegExp flags \"x\"") },
 
     { nxt_string("[0].map(RegExp().toString)"),
-      nxt_string("TypeError: 'this' argument is not a regexp") },
+      nxt_string("TypeError: \"this\" argument is not a regexp") },
 
     /* Non-standard ECMA-262 features. */
 
@@ -6400,7 +6415,7 @@ static njs_unit_test_t  njs_test[] =
     /* Memory object is immutable. */
 
     { nxt_string("var e = MemoryError('e'); e.name = 'E'"),
-      nxt_string("TypeError: Cannot add property 'name', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"name\", object is not extensible") },
 
     { nxt_string("EvalError.prototype.name"),
       nxt_string("EvalError") },
@@ -6561,10 +6576,10 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("SyntaxError: Unexpected token \"null\" in 1") },
 
     { nxt_string("'a'.f()"),
-      nxt_string("TypeError: 'f' is not a function") },
+      nxt_string("TypeError: \"f\" is not a function") },
 
     { nxt_string("1..f()"),
-      nxt_string("TypeError: 'f' is not a function") },
+      nxt_string("TypeError: \"f\" is not a function") },
 
     { nxt_string("try {}"),
       nxt_string("SyntaxError: Missing catch or finally after try in 1") },
@@ -6999,13 +7014,13 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("1") },
 
     { nxt_string("this.undefined = 42"),
-      nxt_string("TypeError: Cannot assign to read-only property 'undefined' of object") },
+      nxt_string("TypeError: Cannot assign to read-only property \"undefined\" of object") },
 
     { nxt_string("this.Infinity = 42"),
-      nxt_string("TypeError: Cannot assign to read-only property 'Infinity' of object") },
+      nxt_string("TypeError: Cannot assign to read-only property \"Infinity\" of object") },
 
     { nxt_string("this.NaN = 42"),
-      nxt_string("TypeError: Cannot assign to read-only property 'NaN' of object") },
+      nxt_string("TypeError: Cannot assign to read-only property \"NaN\" of object") },
 
     { nxt_string("typeof this.undefined"),
       nxt_string("undefined") },
@@ -7074,7 +7089,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("Object.prototype.__proto__.f()"),
-      nxt_string("TypeError: cannot get property 'f' of undefined") },
+      nxt_string("TypeError: cannot get property \"f\" of undefined") },
 
     { nxt_string("Object.prototype.toString.call(Object.prototype)"),
       nxt_string("[object Object]") },
@@ -7095,7 +7110,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("({}).__proto__ = 1"),
-      nxt_string("TypeError: Cannot assign to read-only property '__proto__' of object") },
+      nxt_string("TypeError: Cannot assign to read-only property \"__proto__\" of object") },
 
     { nxt_string("({}).__proto__.constructor === Object"),
       nxt_string("true") },
@@ -7501,7 +7516,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("β") },
 
     { nxt_string("var s = new String('αβ'); s[1] = 'b'"),
-      nxt_string("TypeError: Cannot assign to read-only property '1' of object string") },
+      nxt_string("TypeError: Cannot assign to read-only property \"1\" of object string") },
 
     { nxt_string("var s = new String('αβ'); s[4] = 'ab'; s[4]"),
       nxt_string("ab") },
@@ -7858,10 +7873,10 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("a,1,c,3,b,2") },
 
     { nxt_string("var o = {}; Object.defineProperty(o, 'a', {}); o.a = 1"),
-      nxt_string("TypeError: Cannot assign to read-only property 'a' of object") },
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of object") },
 
     { nxt_string("var o = {}; Object.defineProperty(o, 'a', {writable:false}); o.a = 1"),
-      nxt_string("TypeError: Cannot assign to read-only property 'a' of object") },
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of object") },
 
     { nxt_string("var o = {}; Object.defineProperty(o, 'a', {writable:true});"
                  "o.a = 1; o.a"),
@@ -7869,7 +7884,7 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {value:1}); delete o.a"),
-      nxt_string("TypeError: Cannot delete property 'a' of object") },
+      nxt_string("TypeError: Cannot delete property \"a\" of object") },
 
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {value:1, configurable:true});"
@@ -7879,7 +7894,7 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {value:1, configurable:false});"
                  "delete o.a"),
-      nxt_string("TypeError: Cannot delete property 'a' of object") },
+      nxt_string("TypeError: Cannot delete property \"a\" of object") },
 
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', Object.create({value:2})); o.a"),
@@ -7888,17 +7903,17 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {configurable:false});"
                  "Object.defineProperty(o, 'a', {configurable:true})"),
-      nxt_string("TypeError: Cannot redefine property: 'a'") },
+      nxt_string("TypeError: Cannot redefine property: \"a\"") },
 
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {configurable:false});"
                  "Object.defineProperty(o, 'a', {enumerable:true})"),
-      nxt_string("TypeError: Cannot redefine property: 'a'") },
+      nxt_string("TypeError: Cannot redefine property: \"a\"") },
 
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {configurable:false});"
                  "Object.defineProperty(o, 'a', {writable:true})"),
-      nxt_string("TypeError: Cannot redefine property: 'a'") },
+      nxt_string("TypeError: Cannot redefine property: \"a\"") },
 
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {configurable:false});"
@@ -7933,7 +7948,7 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {value:1});"
                  "Object.defineProperty(o, 'a', {value:2}).a"),
-      nxt_string("TypeError: Cannot redefine property: 'a'") },
+      nxt_string("TypeError: Cannot redefine property: \"a\"") },
 
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {configurable:true});"
@@ -7970,7 +7985,7 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var o = {a:1}; delete o.a;"
                  "Object.defineProperty(o, 'a', { value: 1 }); o.a = 2; o.a"),
-      nxt_string("TypeError: Cannot assign to read-only property 'a' of object") },
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of object") },
 
     { nxt_string("var o = {a:1}; delete o.a;"
                  "Object.defineProperty(o, 'a', { value: 1, writable:1 }); o.a = 2; o.a"),
@@ -8224,16 +8239,16 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("undefined") },
 
     { nxt_string("var o = Object.freeze({a:1}); o.a = 2"),
-      nxt_string("TypeError: Cannot assign to read-only property 'a' of object") },
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of object") },
 
     { nxt_string("var o = Object.freeze({a:1}); delete o.a"),
-      nxt_string("TypeError: Cannot delete property 'a' of object") },
+      nxt_string("TypeError: Cannot delete property \"a\" of object") },
 
     { nxt_string("var o = Object.freeze({a:1}); o.b = 1; o.b"),
-      nxt_string("TypeError: Cannot add property 'b', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"b\", object is not extensible") },
 
     { nxt_string("var o = Object.freeze(Object.create({a:1})); o.a = 2; o.a"),
-      nxt_string("TypeError: Cannot add property 'a', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"a\", object is not extensible") },
 
     { nxt_string("var o = Object.freeze({a:{b:1}}); o.a.b = 2; o.a.b"),
       nxt_string("2") },
@@ -8246,13 +8261,13 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: object is not extensible") },
 
     { nxt_string("var a = [1,2]; a.a = 1; Object.freeze(a); delete a.a"),
-      nxt_string("TypeError: Cannot delete property 'a' of array") },
+      nxt_string("TypeError: Cannot delete property \"a\" of array") },
 
     { nxt_string("var a = [1,2]; a.a = 1; Object.freeze(a); a.a = 2"),
-      nxt_string("TypeError: Cannot assign to read-only property 'a' of array") },
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of array") },
 
     { nxt_string("var a = Object.freeze([1,2]); a.a = 1"),
-      nxt_string("TypeError: Cannot add property 'a', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"a\", object is not extensible") },
 
     { nxt_string("Object.defineProperty(function() {}, 'a', {value:1}).a"),
       nxt_string("1") },
@@ -8262,13 +8277,13 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: object is not extensible") },
 
     { nxt_string("var f = function() {}; f.a = 1; Object.freeze(f); delete f.a"),
-      nxt_string("TypeError: Cannot delete property 'a' of function") },
+      nxt_string("TypeError: Cannot delete property \"a\" of function") },
 
     { nxt_string("var f = function() {}; f.a = 1; Object.freeze(f); f.a = 2"),
-      nxt_string("TypeError: Cannot assign to read-only property 'a' of function") },
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of function") },
 
     { nxt_string("var f = Object.freeze(function() {}); f.a = 1"),
-      nxt_string("TypeError: Cannot add property 'a', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"a\", object is not extensible") },
 
     { nxt_string("Object.defineProperty(new Date(''), 'a', {value:1}).a"),
       nxt_string("1") },
@@ -8279,13 +8294,13 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var d = new Date(''); d.a = 1; Object.freeze(d);"
                  "delete d.a"),
-      nxt_string("TypeError: Cannot delete property 'a' of date") },
+      nxt_string("TypeError: Cannot delete property \"a\" of date") },
 
     { nxt_string("var d = new Date(''); d.a = 1; Object.freeze(d); d.a = 2"),
-      nxt_string("TypeError: Cannot assign to read-only property 'a' of date") },
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of date") },
 
     { nxt_string("var d = Object.freeze(new Date('')); d.a = 1"),
-      nxt_string("TypeError: Cannot add property 'a', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"a\", object is not extensible") },
 
     { nxt_string("Object.defineProperty(new RegExp(''), 'a', {value:1}).a"),
       nxt_string("1") },
@@ -8295,13 +8310,13 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: object is not extensible") },
 
     { nxt_string("var r = new RegExp(''); r.a = 1; Object.freeze(r); delete r.a"),
-      nxt_string("TypeError: Cannot delete property 'a' of regexp") },
+      nxt_string("TypeError: Cannot delete property \"a\" of regexp") },
 
     { nxt_string("var r = new RegExp(''); r.a = 1; Object.freeze(r); r.a = 2"),
-      nxt_string("TypeError: Cannot assign to read-only property 'a' of regexp") },
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of regexp") },
 
     { nxt_string("var r = Object.freeze(new RegExp('')); r.a = 1"),
-      nxt_string("TypeError: Cannot add property 'a', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"a\", object is not extensible") },
 
     { nxt_string("Object.isFrozen({a:1})"),
       nxt_string("false") },
@@ -8361,13 +8376,13 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("2") },
 
     { nxt_string("var o = Object.seal({a:1}); delete o.a"),
-      nxt_string("TypeError: Cannot delete property 'a' of object") },
+      nxt_string("TypeError: Cannot delete property \"a\" of object") },
 
     { nxt_string("var o = Object.seal({a:1}); o.b = 1; o.b"),
-      nxt_string("TypeError: Cannot add property 'b', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"b\", object is not extensible") },
 
     { nxt_string("var o = Object.seal(Object.create({a:1})); o.a = 2; o.a"),
-      nxt_string("TypeError: Cannot add property 'a', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"a\", object is not extensible") },
 
     { nxt_string("var o = Object.seal({a:{b:1}}); o.a.b = 2; o.a.b"),
       nxt_string("2") },
@@ -8450,7 +8465,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("undefined") },
 
     { nxt_string("var o = Object.preventExtensions({a:1}); o.b = 1; o.b"),
-      nxt_string("TypeError: Cannot add property 'b', object is not extensible") },
+      nxt_string("TypeError: Cannot add property \"b\", object is not extensible") },
 
     { nxt_string("Object.preventExtensions()"),
       nxt_string("undefined") },
@@ -10293,7 +10308,7 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var o = JSON.parse('{\"a\":1}', "
                  "                   function(k, v) {return v.a.a;}); o"),
-      nxt_string("TypeError: cannot get property 'a' of undefined") },
+      nxt_string("TypeError: cannot get property \"a\" of undefined") },
 
     /* JSON.stringify() */
 
@@ -10627,7 +10642,7 @@ static njs_unit_test_t  njs_test[] =
     /* require(). */
 
     { nxt_string("require('unknown_module')"),
-      nxt_string("Error: Cannot find module 'unknown_module'") },
+      nxt_string("Error: Cannot find module \"unknown_module\"") },
 
     { nxt_string("require()"),
       nxt_string("TypeError: missing path") },
@@ -10655,15 +10670,15 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var fs = require('fs');"
                  "fs.readFile('/njs_unknown_path', {flag:'xx'}, function () {})"),
-      nxt_string("TypeError: Unknown file open flags: 'xx'") },
+      nxt_string("TypeError: Unknown file open flags: \"xx\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.readFile('/njs_unknown_path', {encoding:'ascii'}, function () {})"),
-      nxt_string("TypeError: Unknown encoding: 'ascii'") },
+      nxt_string("TypeError: Unknown encoding: \"ascii\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.readFile('/njs_unknown_path', 'ascii', function () {})"),
-      nxt_string("TypeError: Unknown encoding: 'ascii'") },
+      nxt_string("TypeError: Unknown encoding: \"ascii\"") },
 
     /* require('fs').readFileSync() */
 
@@ -10677,15 +10692,15 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var fs = require('fs');"
                  "fs.readFileSync('/njs_unknown_path', {flag:'xx'})"),
-      nxt_string("TypeError: Unknown file open flags: 'xx'") },
+      nxt_string("TypeError: Unknown file open flags: \"xx\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.readFileSync('/njs_unknown_path', {encoding:'ascii'})"),
-      nxt_string("TypeError: Unknown encoding: 'ascii'") },
+      nxt_string("TypeError: Unknown encoding: \"ascii\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.readFileSync('/njs_unknown_path', 'ascii')"),
-      nxt_string("TypeError: Unknown encoding: 'ascii'") },
+      nxt_string("TypeError: Unknown encoding: \"ascii\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.readFileSync('/njs_unknown_path', true)"),
@@ -10716,15 +10731,15 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var fs = require('fs');"
                  "fs.writeFile('/njs_unknown_path', '', {flag:'xx'}, function () {})"),
-      nxt_string("TypeError: Unknown file open flags: 'xx'") },
+      nxt_string("TypeError: Unknown file open flags: \"xx\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.writeFile('/njs_unknown_path', '', {encoding:'ascii'}, function () {})"),
-      nxt_string("TypeError: Unknown encoding: 'ascii'") },
+      nxt_string("TypeError: Unknown encoding: \"ascii\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.writeFile('/njs_unknown_path', '', 'ascii', function () {})"),
-      nxt_string("TypeError: Unknown encoding: 'ascii'") },
+      nxt_string("TypeError: Unknown encoding: \"ascii\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.writeFile('/njs_unknown_path', '', true, function () {})"),
@@ -10746,15 +10761,15 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var fs = require('fs');"
                  "fs.writeFileSync('/njs_unknown_path', '', {flag:'xx'})"),
-      nxt_string("TypeError: Unknown file open flags: 'xx'") },
+      nxt_string("TypeError: Unknown file open flags: \"xx\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.writeFileSync('/njs_unknown_path', '', {encoding:'ascii'})"),
-      nxt_string("TypeError: Unknown encoding: 'ascii'") },
+      nxt_string("TypeError: Unknown encoding: \"ascii\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.writeFileSync('/njs_unknown_path', '', 'ascii')"),
-      nxt_string("TypeError: Unknown encoding: 'ascii'") },
+      nxt_string("TypeError: Unknown encoding: \"ascii\"") },
 
     { nxt_string("var fs = require('fs');"
                  "fs.writeFileSync('/njs_unknown_path', '', true)"),
@@ -10819,7 +10834,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: algorithm must be a string") },
 
     { nxt_string("var h = require('crypto').createHash('sha512')"),
-      nxt_string("TypeError: not supported algorithm: 'sha512'") },
+      nxt_string("TypeError: not supported algorithm: \"sha512\"") },
 
     { nxt_string("var h = require('crypto').createHash('sha1');"
                  "h.update()"),
@@ -10831,7 +10846,7 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var h = require('crypto').createHash('sha1');"
                  "h.update('A').digest('latin1')"),
-      nxt_string("TypeError: Unknown digest encoding: 'latin1'") },
+      nxt_string("TypeError: Unknown digest encoding: \"latin1\"") },
 
     { nxt_string("var h = require('crypto').createHash('sha1');"
                  "h.update('A').digest('hex'); h.digest('hex')"),
@@ -10940,7 +10955,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: algorithm must be a string") },
 
     { nxt_string("var h = require('crypto').createHmac('sha512', '')"),
-      nxt_string("TypeError: not supported algorithm: 'sha512'") },
+      nxt_string("TypeError: not supported algorithm: \"sha512\"") },
 
     { nxt_string("var h = require('crypto').createHmac('sha1', [])"),
       nxt_string("TypeError: key must be a string") },
@@ -11099,7 +11114,7 @@ static njs_unit_test_t  njs_tz_test[] =
 typedef struct {
     nxt_lvlhsh_t          hash;
     const njs_extern_t    *proto;
-    nxt_mem_cache_pool_t  *mem_cache_pool;
+    nxt_mp_t              *pool;
 
     uint32_t              a;
     nxt_str_t             uri;
@@ -11138,14 +11153,14 @@ lvlhsh_unit_test_key_test(nxt_lvlhsh_query_t *lhq, void *data)
 static void *
 lvlhsh_unit_test_pool_alloc(void *pool, size_t size, nxt_uint_t nalloc)
 {
-    return nxt_mem_cache_align(pool, size, size);
+    return nxt_mp_align(pool, size, size);
 }
 
 
 static void
 lvlhsh_unit_test_pool_free(void *pool, void *p, size_t size)
 {
-    nxt_mem_cache_free(pool, p);
+    nxt_mp_free(pool, p);
 }
 
 
@@ -11159,12 +11174,12 @@ static const nxt_lvlhsh_proto_t  lvlhsh_proto  nxt_aligned(64) = {
 
 
 static njs_unit_test_prop_t *
-lvlhsh_unit_test_alloc(nxt_mem_cache_pool_t *pool, const njs_value_t *name,
+lvlhsh_unit_test_alloc(nxt_mp_t *pool, const njs_value_t *name,
     const njs_value_t *value)
 {
     njs_unit_test_prop_t *prop;
 
-    prop = nxt_mem_cache_alloc(pool, sizeof(njs_unit_test_prop_t));
+    prop = nxt_mp_alloc(pool, sizeof(njs_unit_test_prop_t));
     if (prop == NULL) {
         return NULL;
     }
@@ -11187,7 +11202,7 @@ lvlhsh_unit_test_add(njs_unit_test_req_t *r, njs_unit_test_prop_t *prop)
     lhq.replace = 1;
     lhq.value = (void *) prop;
     lhq.proto = &lvlhsh_proto;
-    lhq.pool = r->mem_cache_pool;
+    lhq.pool = r->pool;
 
     switch (nxt_lvlhsh_insert(&r->hash, &lhq)) {
 
@@ -11311,14 +11326,14 @@ njs_unit_test_r_set_vars(njs_vm_t *vm, void *obj, uintptr_t data,
     key = (nxt_str_t *) data;
 
     if (key->length == 5 && memcmp(key->start, "error", 5) == 0) {
-        njs_vm_error(vm, "cannot set 'error' prop");
+        njs_vm_error(vm, "cannot set \"error\" prop");
         return NXT_ERROR;
     }
 
     njs_string_create(vm, &name, key->start, key->length, 0);
     njs_string_create(vm, &val, value->start, value->length, 0);
 
-    prop = lvlhsh_unit_test_alloc(vm->mem_cache_pool, &name, &val);
+    prop = lvlhsh_unit_test_alloc(vm->mem_pool, &name, &val);
     if (prop == NULL) {
         njs_memory_error(vm);
         return NXT_ERROR;
@@ -11348,7 +11363,7 @@ njs_unit_test_r_del_vars(njs_vm_t *vm, void *obj, uintptr_t data,
     key = (nxt_str_t *) data;
 
     if (key->length == 5 && memcmp(key->start, "error", 5) == 0) {
-        njs_vm_error(vm, "cannot delete 'error' prop");
+        njs_vm_error(vm, "cannot delete \"error\" prop");
         return NXT_ERROR;
     }
 
@@ -11468,18 +11483,18 @@ njs_unit_test_create_external(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         return NJS_ERROR;
     }
 
-    value = nxt_mem_cache_zalloc(r->mem_cache_pool, sizeof(njs_opaque_value_t));
+    value = nxt_mp_zalloc(r->pool, sizeof(njs_opaque_value_t));
     if (value == NULL) {
         goto memory_error;
     }
 
-    sr = nxt_mem_cache_zalloc(r->mem_cache_pool, sizeof(njs_unit_test_req_t));
+    sr = nxt_mp_zalloc(r->pool, sizeof(njs_unit_test_req_t));
     if (sr == NULL) {
         goto memory_error;
     }
 
     sr->uri = uri;
-    sr->mem_cache_pool = r->mem_cache_pool;
+    sr->pool = r->pool;
     sr->proto = r->proto;
 
     ret = njs_vm_external_create(vm, value, sr->proto, sr);
@@ -11704,9 +11719,9 @@ njs_externals_init(njs_vm_t *vm)
         return NXT_ERROR;
     }
 
-    requests = nxt_mem_cache_zalloc(vm->mem_cache_pool,
-                                    nxt_nitems(nxt_test_requests)
-                                    * sizeof(njs_unit_test_req_t));
+    requests = nxt_mp_zalloc(vm->mem_pool,
+                             nxt_nitems(nxt_test_requests)
+                             * sizeof(njs_unit_test_req_t));
     if (requests == NULL) {
         return NXT_ERROR;
     }
@@ -11714,7 +11729,7 @@ njs_externals_init(njs_vm_t *vm)
     for (i = 0; i < nxt_nitems(nxt_test_requests); i++) {
 
         requests[i] = nxt_test_requests[i].request;
-        requests[i].mem_cache_pool = vm->mem_cache_pool;
+        requests[i].pool = vm->mem_pool;
         requests[i].proto = proto;
 
         ret = njs_vm_external_create(vm, njs_value_arg(&requests[i].value),
@@ -11732,7 +11747,7 @@ njs_externals_init(njs_vm_t *vm)
         }
 
         for (j = 0; j < nxt_nitems(nxt_test_requests[i].props); j++) {
-            prop = lvlhsh_unit_test_alloc(vm->mem_cache_pool,
+            prop = lvlhsh_unit_test_alloc(vm->mem_pool,
                                           &nxt_test_requests[i].props[j].name,
                                           &nxt_test_requests[i].props[j].value);
 

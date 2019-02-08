@@ -17,7 +17,7 @@ typedef struct {
 } njs_interactive_test_t;
 
 
-#define ENTER "\n"
+#define ENTER "\n\3"
 
 
 static njs_interactive_test_t  njs_test[] =
@@ -115,7 +115,7 @@ static njs_interactive_test_t  njs_test[] =
     { nxt_string("function ff(o) {return o.a.a}" ENTER
                  "function f(o) {return ff(o)}" ENTER
                  "f({})" ENTER),
-      nxt_string("TypeError: cannot get property 'a' of undefined\n"
+      nxt_string("TypeError: cannot get property \"a\" of undefined\n"
                  "    at ff (:1)\n"
                  "    at f (:1)\n"
                  "    at main (native)\n") },
@@ -124,20 +124,20 @@ static njs_interactive_test_t  njs_test[] =
                  "function f(o) {try {return ff(o)} "
                                  "finally {return o.a.a}}" ENTER
                  "f({})" ENTER),
-      nxt_string("TypeError: cannot get property 'a' of undefined\n"
+      nxt_string("TypeError: cannot get property \"a\" of undefined\n"
                  "    at f (:1)\n"
                  "    at main (native)\n") },
 
     { nxt_string("function f(ff, o) {return ff(o)}" ENTER
                  "f(function (o) {return o.a.a}, {})" ENTER),
-      nxt_string("TypeError: cannot get property 'a' of undefined\n"
+      nxt_string("TypeError: cannot get property \"a\" of undefined\n"
                  "    at anonymous (:1)\n"
                  "    at f (:1)\n"
                  "    at main (native)\n") },
 
     { nxt_string("'str'.replace(/t/g,"
                  "              function(m) {return m.a.a})" ENTER),
-      nxt_string("TypeError: cannot get property 'a' of undefined\n"
+      nxt_string("TypeError: cannot get property \"a\" of undefined\n"
                  "    at anonymous (:1)\n"
                  "    at String.prototype.replace (native)\n"
                  "    at main (native)\n") },
@@ -155,7 +155,7 @@ static njs_interactive_test_t  njs_test[] =
                  "    at main (native)\n") },
 
     { nxt_string("Math.log({}.a.a)" ENTER),
-      nxt_string("TypeError: cannot get property 'a' of undefined\n"
+      nxt_string("TypeError: cannot get property \"a\" of undefined\n"
                  "    at Math.log (native)\n"
                  "    at main (native)\n") },
 
@@ -175,7 +175,7 @@ static njs_interactive_test_t  njs_test[] =
                  "    at main (native)\n") },
 
     { nxt_string("require('crypto').createHash('sha')" ENTER),
-      nxt_string("TypeError: not supported algorithm: 'sha'\n"
+      nxt_string("TypeError: not supported algorithm: \"sha\"\n"
                  "    at crypto.createHash (native)\n"
                  "    at main (native)\n") },
 
@@ -198,14 +198,14 @@ static njs_interactive_test_t  njs_test[] =
 
     { nxt_string("function f(o) {function f_in(o) {return o.a.a};"
                  "               return f_in(o)}; f({})" ENTER),
-      nxt_string("TypeError: cannot get property 'a' of undefined\n"
+      nxt_string("TypeError: cannot get property \"a\" of undefined\n"
                  "    at f_in (:1)\n"
                  "    at f (:1)\n"
                  "    at main (native)\n") },
 
     { nxt_string("function f(o) {var ff = function (o) {return o.a.a};"
                  "               return ff(o)}; f({})" ENTER),
-      nxt_string("TypeError: cannot get property 'a' of undefined\n"
+      nxt_string("TypeError: cannot get property \"a\" of undefined\n"
                  "    at anonymous (:1)\n"
                  "    at f (:1)\n"
                  "    at main (native)\n") },
@@ -231,6 +231,23 @@ static njs_interactive_test_t  njs_test[] =
     { nxt_string("var o = { toString: function() { return [1] } }" ENTER
                  "o" ENTER),
       nxt_string("TypeError: Cannot convert object to primitive value\n"
+                 "    at main (native)\n") },
+
+    /* line numbers */
+
+    { nxt_string("/**/(function(){throw Error();})()" ENTER),
+      nxt_string("Error\n"
+                 "    at anonymous (:1)\n"
+                 "    at main (native)\n") },
+
+    { nxt_string("/***/(function(){throw Error();})()" ENTER),
+      nxt_string("Error\n"
+                 "    at anonymous (:1)\n"
+                 "    at main (native)\n") },
+
+    { nxt_string("/*\n**/(function(){throw Error();})()" ENTER),
+      nxt_string("Error\n"
+                 "    at anonymous (:2)\n"
                  "    at main (native)\n") },
 
 };
@@ -276,12 +293,12 @@ njs_interactive_test(nxt_bool_t verbose)
         end = NULL;
 
         for ( ;; ) {
-            start = (end != NULL) ? end + 1 : start;
+            start = (end != NULL) ? end + nxt_length(ENTER) : start;
             if (start >= last) {
                 break;
             }
 
-            end = (u_char *) strchr((char *) start, '\n');
+            end = (u_char *) strstr((char *) start, ENTER);
 
             ret = njs_vm_compile(vm, &start, end);
             if (ret == NXT_OK) {

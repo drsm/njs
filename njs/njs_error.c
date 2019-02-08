@@ -15,36 +15,42 @@ static const njs_value_t  njs_error_name_string = njs_string("name");
 
 
 void
-njs_exception_error_create(njs_vm_t *vm, njs_value_type_t type,
-    const char* fmt, ...)
+njs_error_new(njs_vm_t *vm, njs_value_type_t type, u_char *start, size_t size)
 {
-    size_t        size;
-    va_list       args;
     nxt_int_t     ret;
     njs_value_t   string;
     njs_object_t  *error;
-    char          buf[256];
 
-    if (fmt != NULL) {
-        va_start(args, fmt);
-        size = vsnprintf(buf, sizeof(buf), fmt, args);
-        va_end(args);
-
-    } else {
-        size = 0;
-    }
-
-    ret = njs_string_new(vm, &string, (const u_char *) buf, size, size);
+    ret = njs_string_new(vm, &string, start, size, size);
     if (nxt_slow_path(ret != NXT_OK)) {
         return;
     }
 
     error = njs_error_alloc(vm, type, NULL, &string);
+
     if (nxt_fast_path(error != NULL)) {
         vm->retval.data.u.object = error;
         vm->retval.type = type;
         vm->retval.data.truth = 1;
     }
+}
+
+
+void
+njs_error_fmt_new(njs_vm_t *vm, njs_value_type_t type, const char* fmt, ...)
+{
+    va_list  args;
+    u_char   buf[NXT_MAX_ERROR_STR], *p;
+
+    p = buf;
+
+    if (fmt != NULL) {
+        va_start(args, fmt);
+        p = nxt_vsprintf(buf, buf + sizeof(buf), fmt, args);
+        va_end(args);
+    }
+
+    njs_error_new(vm, type, buf, p - buf);
 }
 
 
@@ -57,7 +63,7 @@ njs_error_alloc(njs_vm_t *vm, njs_value_type_t type, const njs_value_t *name,
     njs_object_prop_t   *prop;
     nxt_lvlhsh_query_t  lhq;
 
-    error = nxt_mem_cache_alloc(vm->mem_cache_pool, sizeof(njs_object_t));
+    error = nxt_mp_alloc(vm->mem_pool, sizeof(njs_object_t));
     if (nxt_slow_path(error == NULL)) {
         njs_memory_error(vm);
         return NULL;
@@ -71,7 +77,7 @@ njs_error_alloc(njs_vm_t *vm, njs_value_type_t type, const njs_value_t *name,
     error->__proto__ = &vm->prototypes[njs_error_prototype_index(type)].object;
 
     lhq.replace = 0;
-    lhq.pool = vm->mem_cache_pool;
+    lhq.pool = vm->mem_pool;
 
     if (name != NULL) {
         lhq.key = nxt_string_value("name");
@@ -465,7 +471,7 @@ const njs_object_init_t  njs_uri_error_constructor_init = {
 
 
 void
-njs_set_memory_error(njs_vm_t *vm, njs_value_t *value)
+njs_memory_error_set(njs_vm_t *vm, njs_value_t *value)
 {
     njs_object_t            *object;
     njs_object_prototype_t  *prototypes;
@@ -495,7 +501,7 @@ njs_set_memory_error(njs_vm_t *vm, njs_value_t *value)
 void
 njs_memory_error(njs_vm_t *vm)
 {
-    njs_set_memory_error(vm, &vm->retval);
+    njs_memory_error_set(vm, &vm->retval);
 }
 
 
@@ -503,7 +509,7 @@ njs_ret_t
 njs_memory_error_constructor(njs_vm_t *vm, njs_value_t *args,
     nxt_uint_t nargs, njs_index_t unused)
 {
-    njs_set_memory_error(vm, &vm->retval);
+    njs_memory_error_set(vm, &vm->retval);
 
     return NXT_OK;
 }
@@ -581,7 +587,7 @@ njs_error_prototype_to_string(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     njs_index_t unused)
 {
     if (nargs < 1 || !njs_is_object(&args[0])) {
-        njs_type_error(vm, "'this' argument is not an object");
+        njs_type_error(vm, "\"this\" argument is not an object");
         return NXT_ERROR;
     }
 

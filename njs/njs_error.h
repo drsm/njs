@@ -9,28 +9,30 @@
 
 
 #define njs_error(vm, fmt, ...)                                               \
-    njs_exception_error_create(vm, NJS_OBJECT_ERROR, fmt, ##__VA_ARGS__)
+    njs_error_fmt_new(vm, NJS_OBJECT_ERROR, fmt, ##__VA_ARGS__)
 #define njs_eval_error(vm, fmt, ...)                                          \
-    njs_exception_error_create(vm, NJS_OBJECT_EVAL_ERROR, fmt, ##__VA_ARGS__)
+    njs_error_fmt_new(vm, NJS_OBJECT_EVAL_ERROR, fmt, ##__VA_ARGS__)
 #define njs_internal_error(vm, fmt, ...)                                      \
-    njs_exception_error_create(vm, NJS_OBJECT_INTERNAL_ERROR, fmt,            \
+    njs_error_fmt_new(vm, NJS_OBJECT_INTERNAL_ERROR, fmt,            \
                                ##__VA_ARGS__)
 #define njs_range_error(vm, fmt, ...)                                         \
-    njs_exception_error_create(vm, NJS_OBJECT_RANGE_ERROR, fmt, ##__VA_ARGS__)
+    njs_error_fmt_new(vm, NJS_OBJECT_RANGE_ERROR, fmt, ##__VA_ARGS__)
 #define njs_reference_error(vm, fmt, ...)                                     \
-    njs_exception_error_create(vm, NJS_OBJECT_REF_ERROR, fmt, ##__VA_ARGS__)
+    njs_error_fmt_new(vm, NJS_OBJECT_REF_ERROR, fmt, ##__VA_ARGS__)
 #define njs_syntax_error(vm, fmt, ...)                                        \
-    njs_exception_error_create(vm, NJS_OBJECT_SYNTAX_ERROR, fmt, ##__VA_ARGS__)
+    njs_error_fmt_new(vm, NJS_OBJECT_SYNTAX_ERROR, fmt, ##__VA_ARGS__)
 #define njs_type_error(vm, fmt, ...)                                          \
-    njs_exception_error_create(vm, NJS_OBJECT_TYPE_ERROR, fmt, ##__VA_ARGS__)
+    njs_error_fmt_new(vm, NJS_OBJECT_TYPE_ERROR, fmt, ##__VA_ARGS__)
 #define njs_uri_error(vm, fmt, ...)                                           \
-    njs_exception_error_create(vm, NJS_OBJECT_URI_ERROR, fmt, ##__VA_ARGS__)
+    njs_error_fmt_new(vm, NJS_OBJECT_URI_ERROR, fmt, ##__VA_ARGS__)
 
-void njs_exception_error_create(njs_vm_t *vm, njs_value_type_t type,
+void njs_error_new(njs_vm_t *vm, njs_value_type_t type, u_char *start,
+    size_t size);
+void njs_error_fmt_new(njs_vm_t *vm, njs_value_type_t type,
     const char* fmt, ...);
 
 void njs_memory_error(njs_vm_t *vm);
-void njs_set_memory_error(njs_vm_t *vm, njs_value_t *value);
+void njs_memory_error_set(njs_vm_t *vm, njs_value_t *value);
 
 njs_object_t *njs_error_alloc(njs_vm_t *vm, njs_value_type_t type,
     const njs_value_t *name, const njs_value_t *message);

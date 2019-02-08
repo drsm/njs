@@ -284,12 +284,12 @@ njs_builtin_objects_create(njs_vm_t *vm)
     }
 
     lhq.replace = 0;
-    lhq.pool = vm->mem_cache_pool;
+    lhq.pool = vm->mem_pool;
 
     for (p = njs_module_init; *p != NULL; p++) {
         obj = *p;
 
-        module = nxt_mem_cache_zalloc(vm->mem_cache_pool, sizeof(njs_module_t));
+        module = nxt_mp_zalloc(vm->mem_pool, sizeof(njs_module_t));
         if (nxt_slow_path(module == NULL)) {
             return NJS_ERROR;
         }
@@ -629,7 +629,7 @@ njs_builtin_completions(njs_vm_t *vm, nxt_array_t *array)
             njs_string_get(&prop->name, &string);
             len = obj->name.length + string.length + 2;
 
-            compl = nxt_mem_cache_zalloc(vm->mem_cache_pool, len);
+            compl = nxt_mp_zalloc(vm->mem_pool, len);
             if (compl == NULL) {
                 return NULL;
             }
@@ -649,7 +649,7 @@ njs_builtin_completions(njs_vm_t *vm, nxt_array_t *array)
             njs_string_get(&prop->name, &string);
             len = string.length + 2;
 
-            compl = nxt_mem_cache_zalloc(vm->mem_cache_pool, len);
+            compl = nxt_mp_zalloc(vm->mem_pool, len);
             if (compl == NULL) {
                 return NULL;
             }
@@ -679,7 +679,7 @@ njs_builtin_completions(njs_vm_t *vm, nxt_array_t *array)
             njs_string_get(&prop->name, &string);
             len = obj->name.length + string.length + 2;
 
-            compl = nxt_mem_cache_zalloc(vm->mem_cache_pool, len);
+            compl = nxt_mp_zalloc(vm->mem_pool, len);
             if (compl == NULL) {
                 return NULL;
             }
@@ -705,7 +705,7 @@ njs_builtin_completions(njs_vm_t *vm, nxt_array_t *array)
         nxt_lvlhsh_each_init(&lhe_prop, &njs_extern_hash_proto);
 
         len = ev->name.length + 1;
-        compl = nxt_mem_cache_zalloc(vm->mem_cache_pool, len);
+        compl = nxt_mp_zalloc(vm->mem_pool, len);
         if (compl == NULL) {
             return NULL;
         }
@@ -723,7 +723,7 @@ njs_builtin_completions(njs_vm_t *vm, nxt_array_t *array)
             }
 
             len = ev->name.length + ev->name.length + 2;
-            compl = nxt_mem_cache_zalloc(vm->mem_cache_pool, len);
+            compl = nxt_mp_zalloc(vm->mem_pool, len);
             if (compl == NULL) {
                 return NULL;
             }
@@ -753,8 +753,7 @@ njs_vm_completions(njs_vm_t *vm, nxt_str_t *expression)
         size = njs_builtin_completions_size(vm);
 
         completions = nxt_array_create(size, sizeof(nxt_str_t),
-                                       &njs_array_mem_proto,
-                                       vm->mem_cache_pool);
+                                       &njs_array_mem_proto, vm->mem_pool);
 
         if (nxt_slow_path(completions == NULL)) {
             return NULL;
@@ -879,7 +878,7 @@ njs_object_completions(njs_vm_t *vm, njs_object_t *object)
     } while (o != NULL);
 
     completions = nxt_array_create(size, sizeof(nxt_str_t),
-                                   &njs_array_mem_proto, vm->mem_cache_pool);
+                                   &njs_array_mem_proto, vm->mem_pool);
 
     if (nxt_slow_path(completions == NULL)) {
         return NULL;
@@ -979,69 +978,32 @@ nxt_int_t
 njs_builtin_match_native_function(njs_vm_t *vm, njs_function_t *function,
     nxt_str_t *name)
 {
-    char                       *buf;
     size_t                     len;
-    nxt_str_t                  string;
+    nxt_str_t                  string, middle;
     nxt_int_t                  rc;
     const njs_object_init_t    *obj, **p;
     const njs_object_prop_t    *prop;
     const njs_function_init_t  *fun;
 
+    middle = nxt_string_value(".");
+
     rc = njs_builtin_match(njs_object_init, function, &prop, &obj);
 
     if (rc == NXT_OK) {
-        njs_string_get(&prop->name, &string);
-        len = obj->name.length + string.length + sizeof(".");
-
-        buf = nxt_mem_cache_zalloc(vm->mem_cache_pool, len);
-        if (buf == NULL) {
-            return NXT_ERROR;
-        }
-
-        snprintf(buf, len, "%s.%s", obj->name.start, string.start);
-
-        name->length = len;
-        name->start = (u_char *) buf;
-
-        return NXT_OK;
+        goto found;
     }
 
     rc = njs_builtin_match(njs_prototype_init, function, &prop, &obj);
 
     if (rc == NXT_OK) {
-        njs_string_get(&prop->name, &string);
-        len = obj->name.length + string.length + sizeof(".prototype.");
-
-        buf = nxt_mem_cache_zalloc(vm->mem_cache_pool, len);
-        if (buf == NULL) {
-            return NXT_ERROR;
-        }
-
-        snprintf(buf, len, "%s.prototype.%s", obj->name.start, string.start);
-
-        name->length = len;
-        name->start = (u_char *) buf;
-
-        return NXT_OK;
+        middle = nxt_string_value(".prototype.");
+        goto found;
     }
 
     rc = njs_builtin_match(njs_constructor_init, function, &prop, &obj);
 
     if (rc == NXT_OK) {
-        njs_string_get(&prop->name, &string);
-        len = obj->name.length + string.length + sizeof(".");
-
-        buf = nxt_mem_cache_zalloc(vm->mem_cache_pool, len);
-        if (buf == NULL) {
-            return NXT_ERROR;
-        }
-
-        snprintf(buf, len, "%s.%s", obj->name.start, string.start);
-
-        name->length = len;
-        name->start = (u_char *) buf;
-
-        return NXT_OK;
+        goto found;
     }
 
     fun = njs_native_functions;
@@ -1057,23 +1019,27 @@ njs_builtin_match_native_function(njs_vm_t *vm, njs_function_t *function,
     rc = njs_builtin_match(njs_module_init, function, &prop, &obj);
 
     if (rc == NXT_OK) {
-        njs_string_get(&prop->name, &string);
-        len = obj->name.length + string.length + sizeof(".");
-
-        buf = nxt_mem_cache_zalloc(vm->mem_cache_pool, len);
-        if (buf == NULL) {
-            return NXT_ERROR;
-        }
-
-        snprintf(buf, len, "%s.%s", obj->name.start, string.start);
-
-        name->length = len;
-        name->start = (u_char *) buf;
-
-        return NXT_OK;
+        goto found;
     }
 
     return NXT_DECLINED;
+
+found:
+
+    njs_string_get(&prop->name, &string);
+
+    len = obj->name.length + middle.length + string.length;
+
+    name->length = len;
+    name->start = nxt_mp_zalloc(vm->mem_pool, len);
+    if (name->start == NULL) {
+        return NXT_ERROR;
+    }
+
+    nxt_sprintf(name->start, name->start + len,
+                "%V%V%V", &obj->name, &middle, &string);
+
+    return NXT_OK;
 }
 
 

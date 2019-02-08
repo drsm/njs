@@ -127,7 +127,7 @@ njs_date_constructor(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 
     done:
 
-        date = nxt_mem_cache_alloc(vm->mem_cache_pool, sizeof(njs_date_t));
+        date = nxt_mp_alloc(vm->mem_pool, sizeof(njs_date_t));
         if (nxt_slow_path(date == NULL)) {
             njs_memory_error(vm);
             return NXT_ERROR;
@@ -1901,7 +1901,7 @@ njs_date_prototype_to_json(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         }
     }
 
-    njs_type_error(vm, "'this' argument is not an object");
+    njs_type_error(vm, "\"this\" argument is not an object");
 
     return NXT_ERROR;
 }
