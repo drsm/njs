@@ -210,7 +210,10 @@ typedef enum {
 typedef struct {
     njs_token_t                     token:16;
     njs_token_t                     prev_token:16;
+
     uint8_t                         property;      /* 1 bit */
+    njs_token_t                     property_token:16;
+
     uint32_t                        key_hash;
 
     uint32_t                        token_line;
@@ -306,8 +309,6 @@ void njs_lexer_rollback(njs_lexer_t *lexer);
 nxt_int_t njs_lexer_keywords_init(nxt_mp_t *mcp, nxt_lvlhsh_t *hash);
 njs_token_t njs_lexer_keyword(njs_lexer_t *lexer);
 
-njs_value_t *njs_parser_external(njs_vm_t *vm, njs_parser_t *parser);
-
 nxt_int_t njs_parser(njs_vm_t *vm, njs_parser_t *parser,
     njs_parser_t *prev);
 njs_token_t njs_parser_arguments(njs_vm_t *vm, njs_parser_t *parser,
@@ -320,10 +321,8 @@ njs_token_t njs_parser_assignment_expression(njs_vm_t *vm,
     njs_parser_t *parser, njs_token_t token);
 njs_token_t njs_parser_terminal(njs_vm_t *vm, njs_parser_t *parser,
     njs_token_t token);
-njs_token_t njs_parser_property_name(njs_vm_t *vm, njs_parser_t *parser);
-njs_token_t njs_parser_property_token(njs_parser_t *parser);
+njs_token_t njs_parser_property_token(njs_vm_t *vm, njs_parser_t *parser);
 njs_token_t njs_parser_token(njs_parser_t *parser);
-nxt_int_t njs_parser_string_create(njs_vm_t *vm, njs_value_t *value);
 njs_variable_t *njs_variable_resolve(njs_vm_t *vm, njs_parser_node_t *node);
 njs_index_t njs_variable_typeof(njs_vm_t *vm, njs_parser_node_t *node);
 njs_index_t njs_variable_index(njs_vm_t *vm, njs_parser_node_t *node);
