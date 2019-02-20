@@ -10,8 +10,6 @@
 
 
 static nxt_int_t njs_vm_init(njs_vm_t *vm);
-static nxt_int_t njs_vm_invoke(njs_vm_t *vm, njs_function_t *function,
-    const njs_value_t *args, nxt_uint_t nargs, njs_index_t retval);
 static nxt_int_t njs_vm_handle_events(njs_vm_t *vm);
 
 
@@ -218,34 +216,33 @@ njs_vm_destroy(njs_vm_t *vm)
 nxt_int_t
 njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
 {
-    nxt_int_t         ret;
-    njs_lexer_t      *lexer;
-    njs_parser_t     *parser, *prev;
-    njs_generator_t  *generator;
+    nxt_int_t           ret;
+    njs_lexer_t         lexer;
+    njs_parser_t        *parser, *prev;
+    njs_generator_t     generator;
+    njs_parser_scope_t  *scope;
+
+    if (vm->parser != NULL && !vm->options.accumulative) {
+        return NJS_ERROR;
+    }
 
     parser = nxt_mp_zalloc(vm->mem_pool, sizeof(njs_parser_t));
     if (nxt_slow_path(parser == NULL)) {
         return NJS_ERROR;
     }
 
-    if (vm->parser != NULL && !vm->options.accumulative) {
-        return NJS_ERROR;
-    }
-
     prev = vm->parser;
     vm->parser = parser;
 
-    lexer = nxt_mp_zalloc(vm->mem_pool, sizeof(njs_lexer_t));
-    if (nxt_slow_path(lexer == NULL)) {
-        return NJS_ERROR;
-    }
+    nxt_memzero(&lexer, sizeof(njs_lexer_t));
 
-    parser->lexer = lexer;
-    lexer->start = *start;
-    lexer->end = end;
-    lexer->line = 1;
-    lexer->file = vm->options.file;
-    lexer->keywords_hash = vm->shared->keywords_hash;
+    lexer.start = *start;
+    lexer.end = end;
+    lexer.line = 1;
+    lexer.file = vm->options.file;
+    lexer.keywords_hash = vm->shared->keywords_hash;
+
+    parser->lexer = &lexer;
 
     if (vm->backtrace != NULL) {
         nxt_array_reset(vm->backtrace);
@@ -258,12 +255,14 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
         goto fail;
     }
 
-    ret = njs_variables_scope_reference(vm, parser->scope);
+    scope = parser->scope;
+
+    ret = njs_variables_scope_reference(vm, scope);
     if (nxt_slow_path(ret != NXT_OK)) {
         goto fail;
     }
 
-    *start = parser->lexer->start;
+    *start = lexer.start;
 
     /*
      * Reset the code array to prevent it from being disassembled
@@ -271,26 +270,18 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
      */
     vm->code = NULL;
 
-    generator = nxt_mp_align(vm->mem_pool, sizeof(njs_value_t),
-                             sizeof(njs_generator_t));
+    nxt_memzero(&generator, sizeof(njs_generator_t));
 
-    if (nxt_slow_path(generator == NULL)) {
-        goto fail;
-    }
-
-    nxt_memzero(generator, sizeof(njs_generator_t));
-
-    ret = njs_generate_scope(vm, generator, parser->scope);
+    ret = njs_generate_scope(vm, &generator, scope);
     if (nxt_slow_path(ret != NXT_OK)) {
         goto fail;
     }
 
-    vm->current = generator->code_start;
+    vm->current = generator.code_start;
+    vm->global_scope = generator.local_scope;
+    vm->scope_size = generator.scope_size;
 
-    vm->global_scope = generator->local_scope;
-    vm->scope_size = generator->scope_size;
-
-    vm->variables_hash = parser->scope->variables;
+    vm->variables_hash = scope->variables;
 
     if (vm->options.init) {
         ret = njs_vm_init(vm);
@@ -458,11 +449,11 @@ nxt_int_t
 njs_vm_call(njs_vm_t *vm, njs_function_t *function, const njs_value_t *args,
     nxt_uint_t nargs)
 {
-    return  njs_vm_invoke(vm, function, args, nargs, NJS_INDEX_GLOBAL_RETVAL);
+    return njs_vm_invoke(vm, function, args, nargs, NJS_INDEX_GLOBAL_RETVAL);
 }
 
 
-static nxt_int_t
+nxt_int_t
 njs_vm_invoke(njs_vm_t *vm, njs_function_t *function, const njs_value_t *args,
     nxt_uint_t nargs, njs_index_t retval)
 {
