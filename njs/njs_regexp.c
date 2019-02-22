@@ -377,11 +377,11 @@ njs_regexp_compile_trace_handler(nxt_trace_t *trace, nxt_trace_data_t *td,
     p = trace->handler(trace, td, start);
 
     if (vm->parser != NULL) {
-        njs_syntax_error(vm, "%*s in %uD", (int) (p - start), start,
+        njs_syntax_error(vm, "%*s in %uD", p - start, start,
                          vm->parser->lexer->line);
 
     } else {
-        njs_syntax_error(vm, "%*s", (int) (p - start), start);
+        njs_syntax_error(vm, "%*s", p - start, start);
     }
 
     return p;
@@ -798,7 +798,7 @@ njs_regexp_string_create(njs_vm_t *vm, njs_value_t *value, u_char *start,
 {
     length = (length >= 0) ? length : 0;
 
-    return njs_string_create(vm, value, start, size, length);
+    return njs_string_new(vm, value, start, size, length);
 }
 
 

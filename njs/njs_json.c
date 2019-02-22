@@ -115,7 +115,7 @@ static njs_json_state_t *njs_json_push_parse_state(njs_vm_t *vm,
     njs_json_parse_t *parse, njs_value_t *value);
 static njs_json_state_t *njs_json_pop_parse_state(njs_json_parse_t *parse);
 static void njs_json_parse_exception(njs_json_parse_ctx_t *ctx,
-    const char* msg, const u_char *pos);
+    const char *msg, const u_char *pos);
 
 static njs_ret_t njs_json_stringify_continuation(njs_vm_t *vm,
     njs_value_t *args, nxt_uint_t nargs, njs_index_t unused);
@@ -152,7 +152,7 @@ static njs_value_t *njs_json_wrap_value(njs_vm_t *vm, njs_value_t *value);
 #define njs_json_buf_node_room(n) (size_t) ((n)->end - (n)->pos)
 
 static nxt_int_t njs_json_buf_append(njs_json_stringify_t *stringify,
-    const char* msg, size_t len);
+    const char *msg, size_t len);
 static u_char *njs_json_buf_reserve(njs_json_stringify_t *stringify,
     size_t size);
 static nxt_int_t njs_json_buf_pullup(njs_json_stringify_t *stringify,
@@ -628,6 +628,7 @@ njs_json_parse_string(njs_json_parse_ctx_t *ctx, njs_value_t *value,
 
     start = p + 1;
 
+    dst = NULL;
     state = 0;
     surplus = 0;
 
@@ -807,9 +808,13 @@ njs_json_parse_string(njs_json_parse_ctx_t *ctx, njs_value_t *value,
         length = 0;
     }
 
-    ret = njs_string_create(ctx->vm, value, (u_char *) start, size, length);
+    ret = njs_string_new(ctx->vm, value, (u_char *) start, size, length);
     if (nxt_slow_path(ret != NXT_OK)) {
         return NULL;
+    }
+
+    if (dst != NULL) {
+        nxt_mp_free(ctx->pool, dst);
     }
 
     return last + 1;
@@ -1121,7 +1126,7 @@ njs_json_pop_parse_state(njs_json_parse_t *parse)
 
 
 static void
-njs_json_parse_exception(njs_json_parse_ctx_t *ctx, const char* msg,
+njs_json_parse_exception(njs_json_parse_ctx_t *ctx, const char *msg,
     const u_char *pos)
 {
     ssize_t  length;
@@ -1188,6 +1193,8 @@ static njs_ret_t
 njs_json_stringify_continuation(njs_vm_t *vm, njs_value_t *args,
     nxt_uint_t nargs, njs_index_t unused)
 {
+    u_char                *start;
+    size_t                size;
     ssize_t               length;
     nxt_int_t             i;
     njs_ret_t             ret;
@@ -1406,25 +1413,37 @@ done:
      */
     if (str.length <= nxt_length("{\n\n}")) {
         vm->retval = njs_value_void;
-        return NXT_OK;
+        goto release;
     }
 
     /* Stripping the wrapper's data. */
 
-    str.start += nxt_length("{\"\":");
-    str.length -= nxt_length("{\"\":}");
+    start = str.start;
+    size = str.length;
+
+    start += nxt_length("{\"\":");
+    size -= nxt_length("{\"\":}");
 
     if (stringify->space.length != 0) {
-        str.start += nxt_length("\n ");
-        str.length -= nxt_length("\n \n");
+        start += nxt_length("\n ");
+        size -= nxt_length("\n \n");
     }
 
-    length = nxt_utf8_length(str.start, str.length);
+    length = nxt_utf8_length(start, size);
     if (nxt_slow_path(length < 0)) {
         length = 0;
     }
 
-    return njs_string_create(vm, &vm->retval, str.start, str.length, length);
+    ret = njs_string_new(vm, &vm->retval, start, size, length);
+    if (nxt_slow_path(ret != NXT_OK)) {
+        goto memory_error;
+    }
+
+release:
+
+    nxt_mp_free(vm->mem_pool, str.start);
+
+    return NXT_OK;
 
 memory_error:
 
@@ -1908,7 +1927,7 @@ njs_json_wrap_value(njs_vm_t *vm, njs_value_t *value)
 
 
 static nxt_int_t
-njs_json_buf_append(njs_json_stringify_t *stringify, const char* msg,
+njs_json_buf_append(njs_json_stringify_t *stringify, const char *msg,
     size_t len)
 {
     u_char  *p;
