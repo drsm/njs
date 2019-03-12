@@ -234,13 +234,10 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
     prev = vm->parser;
     vm->parser = parser;
 
-    nxt_memzero(&lexer, sizeof(njs_lexer_t));
-
-    lexer.start = *start;
-    lexer.end = end;
-    lexer.line = 1;
-    lexer.file = vm->options.file;
-    lexer.keywords_hash = vm->shared->keywords_hash;
+    ret = njs_lexer_init(vm, &lexer, &vm->options.file, *start, end);
+    if (nxt_slow_path(ret != NXT_OK)) {
+        return NJS_ERROR;
+    }
 
     parser->lexer = &lexer;
 
@@ -254,6 +251,8 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
     if (nxt_slow_path(ret != NXT_OK)) {
         goto fail;
     }
+
+    parser->lexer = NULL;
 
     scope = parser->scope;
 
@@ -327,7 +326,9 @@ njs_vm_clone(njs_vm_t *vm, njs_external_ptr_t external)
         nvm->mem_pool = nmp;
 
         nvm->shared = vm->shared;
+
         nvm->trace = vm->trace;
+        nvm->trace.data = nvm;
 
         nvm->variables_hash = vm->variables_hash;
         nvm->values_hash = vm->values_hash;

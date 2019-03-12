@@ -175,7 +175,7 @@ njs_reference_hash_test(nxt_lvlhsh_query_t *lhq, void *data)
 }
 
 
-const nxt_lvlhsh_proto_t  njs_reference_hash_proto
+const nxt_lvlhsh_proto_t  njs_references_hash_proto
     nxt_aligned(64) =
 {
     NXT_LVLHSH_DEFAULT,
@@ -205,7 +205,7 @@ njs_variable_reference(njs_vm_t *vm, njs_parser_scope_t *scope,
 
         lhq.key_hash = hash;
         lhq.key = vr->name;
-        lhq.proto = &njs_reference_hash_proto;
+        lhq.proto = &njs_references_hash_proto;
         lhq.replace = 0;
         lhq.value = node;
         lhq.pool = vm->mem_pool;
@@ -508,7 +508,7 @@ njs_scope_next_index(njs_vm_t *vm, njs_parser_scope_t *scope,
     njs_value_t  *value;
     nxt_array_t  *values;
 
-    if (vm->options.accumulative && scope->type == NJS_SCOPE_GLOBAL) {
+    if (njs_scope_accumulative(vm, scope)) {
         /*
          * When non-clonable VM runs in accumulative mode all
          * global variables should be allocated in absolute scope

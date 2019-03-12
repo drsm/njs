@@ -142,7 +142,7 @@ const nxt_lvlhsh_proto_t  njs_keyword_hash_proto
 
 
 nxt_int_t
-njs_lexer_keywords_init(nxt_mp_t *mcp, nxt_lvlhsh_t *hash)
+njs_lexer_keywords_init(nxt_mp_t *mp, nxt_lvlhsh_t *hash)
 {
     nxt_uint_t           n;
     nxt_lvlhsh_query_t   lhq;
@@ -153,7 +153,7 @@ njs_lexer_keywords_init(nxt_mp_t *mcp, nxt_lvlhsh_t *hash)
 
     lhq.replace = 0;
     lhq.proto = &njs_keyword_hash_proto;
-    lhq.pool = mcp;
+    lhq.pool = mp;
 
     do {
         lhq.key_hash = nxt_djb_hash(keyword->name.start, keyword->name.length);
@@ -173,22 +173,19 @@ njs_lexer_keywords_init(nxt_mp_t *mcp, nxt_lvlhsh_t *hash)
 }
 
 
-njs_token_t
-njs_lexer_keyword(njs_lexer_t *lexer)
+void
+njs_lexer_keyword(njs_lexer_t *lexer, njs_lexer_token_t *lt)
 {
     njs_keyword_t       *keyword;
     nxt_lvlhsh_query_t  lhq;
 
-    lhq.key_hash = lexer->key_hash;
-    lhq.key = lexer->text;
+    lhq.key_hash = lt->key_hash;
+    lhq.key = lt->text;
     lhq.proto = &njs_keyword_hash_proto;
 
     if (nxt_lvlhsh_find(&lexer->keywords_hash, &lhq) == NXT_OK) {
         keyword = lhq.value;
-        lexer->number = keyword->number;
-
-        return keyword->token;
+        lt->token = keyword->token;
+        lt->number = keyword->number;
     }
-
-    return NJS_TOKEN_NAME;
 }

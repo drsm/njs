@@ -138,7 +138,8 @@ njs_regexp_create(njs_vm_t *vm, njs_value_t *value, u_char *start,
 njs_token_t
 njs_regexp_literal(njs_vm_t *vm, njs_parser_t *parser, njs_value_t *value)
 {
-    u_char                *p;
+    u_char                *p, c;
+    nxt_str_t             text;
     njs_lexer_t           *lexer;
     njs_regexp_flags_t    flags;
     njs_regexp_pattern_t  *pattern;
@@ -147,14 +148,15 @@ njs_regexp_literal(njs_vm_t *vm, njs_parser_t *parser, njs_value_t *value)
 
     for (p = lexer->start; p < lexer->end; p++) {
 
-        if (*p == '\\') {
-            p++;
-            continue;
+        c = *p;
+
+        if (c == '\n' || c == '\r') {
+            break;
         }
 
-        if (*p == '/') {
-            lexer->text.start = lexer->start;
-            lexer->text.length = p - lexer->text.start;
+        if (c == '/' && !(p > lexer->start && p[-1] == '\\')) {
+            text.start = lexer->start;
+            text.length = p - text.start;
             p++;
             lexer->start = p;
 
@@ -170,8 +172,8 @@ njs_regexp_literal(njs_vm_t *vm, njs_parser_t *parser, njs_value_t *value)
 
             lexer->start = p;
 
-            pattern = njs_regexp_pattern_create(vm, lexer->text.start,
-                                                lexer->text.length, flags);
+            pattern = njs_regexp_pattern_create(vm, text.start, text.length,
+                                                flags);
             if (nxt_slow_path(pattern == NULL)) {
                 return NJS_TOKEN_ILLEGAL;
             }
@@ -376,7 +378,7 @@ njs_regexp_compile_trace_handler(nxt_trace_t *trace, nxt_trace_data_t *td,
     trace = trace->next;
     p = trace->handler(trace, td, start);
 
-    if (vm->parser != NULL) {
+    if (vm->parser != NULL && vm->parser->lexer != NULL) {
         njs_syntax_error(vm, "%*s in %uD", p - start, start,
                          vm->parser->lexer->line);
 
