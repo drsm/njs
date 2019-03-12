@@ -22,6 +22,8 @@
 
 typedef struct {
     char                    *file;
+    size_t                  n_paths;
+    char                    **paths;
     nxt_int_t               version;
     nxt_int_t               disassemble;
     nxt_int_t               interactive;
@@ -68,6 +70,7 @@ static nxt_int_t njs_console_init(njs_vm_t *vm, njs_console_t *console);
 static nxt_int_t njs_externals_init(njs_vm_t *vm, njs_console_t *console);
 static nxt_int_t njs_interactive_shell(njs_opts_t *opts,
     njs_vm_opt_t *vm_options);
+static njs_vm_t *njs_create_vm(njs_opts_t *opts, njs_vm_opt_t *vm_options);
 static nxt_int_t njs_process_file(njs_opts_t *opts, njs_vm_opt_t *vm_options);
 static nxt_int_t njs_process_script(njs_console_t *console, njs_opts_t *opts,
     const nxt_str_t *script);
@@ -246,6 +249,8 @@ main(int argc, char **argv)
         ret = njs_process_file(&opts, &vm_options);
     }
 
+    free(opts.paths);
+
     return (ret == NXT_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
@@ -263,6 +268,7 @@ njs_get_options(njs_opts_t *opts, int argc, char** argv)
         "  -d              print disassembled code.\n"
         "  -q              disable interactive introduction prompt.\n"
         "  -s              sandbox mode.\n"
+        "  -p              set multiple pathes prefix for modules.\n"
         "  -v              print njs version and exit.\n"
         "  <filename> | -  run code from a file or stdin.\n";
 
@@ -297,6 +303,23 @@ njs_get_options(njs_opts_t *opts, int argc, char** argv)
         case 's':
             opts->sandbox = 1;
             break;
+
+        case 'p':
+            if (argv[++i] != NULL) {
+                opts->n_paths++;
+                opts->paths = realloc(opts->paths,
+                                      opts->n_paths * sizeof(char *));
+                if (opts->paths == NULL) {
+                    fprintf(stderr, "failed to add path\n");
+                    return NXT_ERROR;
+                }
+
+                opts->paths[opts->n_paths - 1] = argv[i];
+                break;
+            }
+
+            fprintf(stderr, "option \"-p\" requires directory name\n");
+            return NXT_ERROR;
 
         case 'v':
         case 'V':
@@ -383,14 +406,8 @@ njs_interactive_shell(njs_opts_t *opts, njs_vm_opt_t *vm_options)
         return NXT_ERROR;
     }
 
-    vm = njs_vm_create(vm_options);
+    vm = njs_create_vm(opts, vm_options);
     if (vm == NULL) {
-        fprintf(stderr, "failed to create vm\n");
-        return NXT_ERROR;
-    }
-
-    if (njs_externals_init(vm, vm_options->external) != NXT_OK) {
-        fprintf(stderr, "failed to add external protos\n");
         return NXT_ERROR;
     }
 
@@ -511,16 +528,8 @@ njs_process_file(njs_opts_t *opts, njs_vm_opt_t *vm_options)
         script.length += n;
     }
 
-    vm = njs_vm_create(vm_options);
+    vm = njs_create_vm(opts, vm_options);
     if (vm == NULL) {
-        fprintf(stderr, "failed to create vm\n");
-        ret = NXT_ERROR;
-        goto done;
-    }
-
-    ret = njs_externals_init(vm, vm_options->external);
-    if (ret != NXT_OK) {
-        fprintf(stderr, "failed to add external protos\n");
         ret = NXT_ERROR;
         goto done;
     }
@@ -546,6 +555,65 @@ close_fd:
     }
 
     return ret;
+}
+
+
+static njs_vm_t *
+njs_create_vm(njs_opts_t *opts, njs_vm_opt_t *vm_options)
+{
+    char        *p, *pp;
+    njs_vm_t    *vm;
+    nxt_int_t   ret;
+    nxt_str_t   path;
+    nxt_uint_t  i;
+
+    vm = njs_vm_create(vm_options);
+    if (vm == NULL) {
+        fprintf(stderr, "failed to create vm\n");
+        return NULL;
+    }
+
+    if (njs_externals_init(vm, vm_options->external) != NXT_OK) {
+        fprintf(stderr, "failed to add external protos\n");
+        return NULL;
+    }
+
+    for (i = 0; i < opts->n_paths; i++) {
+        path.start = (u_char *) opts->paths[i];
+        path.length = strlen(opts->paths[i]);
+
+        ret = njs_vm_add_path(vm, &path);
+        if (ret != NXT_OK) {
+            fprintf(stderr, "failed to add path\n");
+            return NULL;
+        }
+    }
+
+    pp = getenv("NJS_PATH");
+    if (pp == NULL) {
+        return vm;
+    }
+
+    while (1) {
+        p = strchr(pp, ':');
+
+        path.start = (u_char *) pp;
+        path.length = (p != NULL) ? (size_t) (p - pp) : strlen(pp);
+
+        ret = njs_vm_add_path(vm, &path);
+        if (ret != NXT_OK) {
+            fprintf(stderr, "failed to add path\n");
+            return NULL;
+        }
+
+        if (p == NULL) {
+            break;
+        }
+
+        pp = p + 1;
+    }
+
+    return vm;
 }
 
 
