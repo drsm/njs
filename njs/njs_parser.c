@@ -332,6 +332,8 @@ static njs_token_t
 njs_parser_statement(njs_vm_t *vm, njs_parser_t *parser,
     njs_token_t token)
 {
+    size_t  offset;
+
     parser->node = NULL;
 
     switch (token) {
@@ -374,12 +376,6 @@ njs_parser_statement(njs_vm_t *vm, njs_parser_t *parser,
 
     default:
 
-        if (token == NJS_TOKEN_NAME
-            && njs_parser_peek_token(vm, parser, 0) == NJS_TOKEN_COLON)
-        {
-            return njs_parser_labelled_statement(vm, parser);
-        }
-
         switch (token) {
         case NJS_TOKEN_VAR:
             token = njs_parser_var_statement(vm, parser);
@@ -397,6 +393,14 @@ njs_parser_statement(njs_vm_t *vm, njs_parser_t *parser,
         case NJS_TOKEN_BREAK:
             token = njs_parser_brk_statement(vm, parser, token);
             break;
+
+        case NJS_TOKEN_NAME:
+            offset = 0;
+            if (njs_parser_peek_token(vm, parser, &offset) == NJS_TOKEN_COLON) {
+                return njs_parser_labelled_statement(vm, parser);
+            }
+
+            /* Fall through. */
 
         default:
             token = njs_parser_expression(vm, parser, token);
@@ -635,7 +639,7 @@ njs_parser_function_declaration(njs_vm_t *vm, njs_parser_t *parser)
     }
 
     if (token != NJS_TOKEN_NAME) {
-        if (token == NJS_TOKEN_ARGUMENTS || token ==  NJS_TOKEN_EVAL) {
+        if (token == NJS_TOKEN_ARGUMENTS || token == NJS_TOKEN_EVAL) {
             njs_parser_syntax_error(vm, parser, "Identifier \"%V\" "
                                     "is forbidden in function declaration",
                                     njs_parser_text(parser));
@@ -1019,7 +1023,7 @@ njs_parser_var_statement(njs_vm_t *vm, njs_parser_t *parser)
         }
 
         if (token != NJS_TOKEN_NAME) {
-            if (token == NJS_TOKEN_ARGUMENTS || token ==  NJS_TOKEN_EVAL) {
+            if (token == NJS_TOKEN_ARGUMENTS || token == NJS_TOKEN_EVAL) {
                 njs_parser_syntax_error(vm, parser, "Identifier \"%V\" "
                                         "is forbidden in var declaration",
                                         njs_parser_text(parser));
@@ -1471,7 +1475,7 @@ njs_parser_for_var_statement(njs_vm_t *vm, njs_parser_t *parser)
         }
 
         if (token != NJS_TOKEN_NAME) {
-            if (token == NJS_TOKEN_ARGUMENTS || token ==  NJS_TOKEN_EVAL) {
+            if (token == NJS_TOKEN_ARGUMENTS || token == NJS_TOKEN_EVAL) {
                 njs_parser_syntax_error(vm, parser, "Identifier \"%V\" "
                                        "is forbidden in for-in var declaration",
                                        njs_parser_text(parser));

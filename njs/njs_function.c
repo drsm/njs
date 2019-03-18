@@ -32,6 +32,7 @@ njs_function_alloc(njs_vm_t *vm)
         function->object.shared = 1;
         function->object.extensible = 1;
         function->args_offset = 1;
+        function->ctor = 1;
 
         function->u.lambda = nxt_mp_zalloc(vm->mem_pool,
                                            sizeof(njs_function_lambda_t));
@@ -310,6 +311,7 @@ njs_function_lambda_frame(njs_vm_t *vm, njs_function_t *function,
 
     } else {
         n = function->args_offset;
+        native_frame->nargs += n - 1;
 
         do {
             *value++ = *bound++;
