@@ -10028,6 +10028,18 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Math.max('1', '2', '5')"),
       nxt_string("5") },
 
+    { nxt_string("Math.max(5, {valueOf: function () {return 10}}, 6)"),
+      nxt_string("10") },
+
+    { nxt_string("Math.max(5, {valueOf: function () {return 10}}, 20)"),
+      nxt_string("20") },
+
+    { nxt_string("Math.max(5, undefined, 20)"),
+      nxt_string("NaN") },
+
+    { nxt_string("Math.max(-10, null, -30)"),
+      nxt_string("0") },
+
     { nxt_string("Math.min()"),
       nxt_string("Infinity") },
 
@@ -11903,7 +11915,7 @@ njs_unit_test_method_external(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
                                        r->uri.length);
     }
 
-    vm->retval = njs_value_void;
+    vm->retval = njs_value_undefined;
 
     return NJS_OK;
 }
