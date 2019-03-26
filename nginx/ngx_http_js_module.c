@@ -14,6 +14,7 @@
 
 typedef struct {
     njs_vm_t            *vm;
+    ngx_array_t         *paths;
     const njs_extern_t  *req_proto;
 } ngx_http_js_main_conf_t;
 
@@ -138,6 +139,8 @@ static void ngx_http_js_clear_timer(njs_external_ptr_t external,
 static void ngx_http_js_timer_handler(ngx_event_t *ev);
 static void ngx_http_js_handle_event(ngx_http_request_t *r,
     njs_vm_event_t vm_event, njs_value_t *args, nxt_uint_t nargs);
+static njs_ret_t ngx_http_js_string(njs_vm_t *vm, const njs_value_t *value,
+    nxt_str_t *str);
 
 static char *ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
@@ -157,6 +160,13 @@ static ngx_command_t  ngx_http_js_commands[] = {
       ngx_http_js_include,
       NGX_HTTP_MAIN_CONF_OFFSET,
       0,
+      NULL },
+
+    { ngx_string("js_path"),
+      NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_array_slot,
+      NGX_HTTP_MAIN_CONF_OFFSET,
+      offsetof(ngx_http_js_main_conf_t, paths),
       NULL },
 
     { ngx_string("js_set"),
@@ -922,7 +932,8 @@ ngx_http_js_ext_get_header_out(njs_vm_t *vm, njs_value_t *value, void *obj,
     h = ngx_http_js_get_header(&r->headers_out.headers.part, v->start,
                                v->length);
     if (h == NULL) {
-        return njs_vm_value_string_set(vm, value, NULL, 0);
+        njs_value_undefined_set(value);
+        return NJS_OK;
     }
 
     return njs_vm_value_string_set(vm, value, h->value.data, h->value.len);
@@ -1204,17 +1215,17 @@ ngx_http_js_ext_return(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 {
     nxt_str_t                  text;
     ngx_int_t                  status;
-    njs_value_t               *value;
     ngx_http_js_ctx_t         *ctx;
     ngx_http_request_t        *r;
+    const njs_value_t         *value;
     ngx_http_complex_value_t   cv;
 
-    if (nargs < 2) {
-        njs_vm_error(vm, "too few arguments");
+    r = njs_vm_external(vm, njs_arg(args, nargs, 0));
+    if (nxt_slow_path(r == NULL)) {
         return NJS_ERROR;
     }
 
-    value = njs_argument(args, 1);
+    value = njs_arg(args, nargs, 1);
     if (!njs_value_is_valid_number(value)) {
         njs_vm_error(vm, "code is not a number");
         return NJS_ERROR;
@@ -1227,21 +1238,8 @@ ngx_http_js_ext_return(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         return NJS_ERROR;
     }
 
-    if (nargs < 3) {
-        text.start = NULL;
-        text.length = 0;
-
-    } else {
-        if (njs_vm_value_to_ext_string(vm, &text, njs_argument(args, 2), 0)
-            == NJS_ERROR)
-        {
-            njs_vm_error(vm, "failed to convert text");
-            return NJS_ERROR;
-        }
-    }
-
-    r = njs_vm_external(vm, njs_argument(args, 0));
-    if (nxt_slow_path(r == NULL)) {
+    if (ngx_http_js_string(vm, njs_arg(args, nargs, 2), &text) != NJS_OK) {
+        njs_vm_error(vm, "failed to convert text");
         return NJS_ERROR;
     }
 
@@ -1276,21 +1274,14 @@ ngx_http_js_ext_internal_redirect(njs_vm_t *vm, njs_value_t *args,
     ngx_http_js_ctx_t   *ctx;
     ngx_http_request_t  *r;
 
-    if (nargs < 2) {
-        njs_vm_error(vm, "too few arguments");
-        return NJS_ERROR;
-    }
-
-    r = njs_vm_external(vm, njs_argument(args, 0));
+    r = njs_vm_external(vm, njs_arg(args, nargs, 0));
     if (nxt_slow_path(r == NULL)) {
         return NJS_ERROR;
     }
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_js_module);
 
-    if (njs_vm_value_to_ext_string(vm, &uri, njs_argument(args, 1), 0)
-        == NJS_ERROR)
-    {
+    if (ngx_http_js_string(vm, njs_arg(args, nargs, 1), &uri) != NJS_OK) {
         njs_vm_error(vm, "failed to convert uri arg");
         return NJS_ERROR;
     }
@@ -1433,8 +1424,8 @@ ngx_http_js_ext_get_request_body(njs_vm_t *vm, njs_value_t *value, void *obj,
     }
 
     if (r->request_body == NULL || r->request_body->bufs == NULL) {
-        njs_vm_error(vm, "request body is unavailable");
-        return NJS_ERROR;
+        njs_value_undefined_set(value);
+        return NJS_OK;
     }
 
     if (r->request_body->temp_file) {
@@ -1502,7 +1493,8 @@ ngx_http_js_ext_get_header_in(njs_vm_t *vm, njs_value_t *value, void *obj,
     h = ngx_http_js_get_header(&r->headers_in.headers.part, v->start,
                                v->length);
     if (h == NULL) {
-        return njs_vm_value_string_set(vm, value, NULL, 0);
+        njs_value_undefined_set(value);
+        return NJS_OK;
     }
 
     return njs_vm_value_string_set(vm, value, h->value.data, h->value.len);
@@ -1531,7 +1523,9 @@ ngx_http_js_ext_get_arg(njs_vm_t *vm, njs_value_t *value, void *obj,
         return njs_vm_value_string_set(vm, value, arg.data, arg.len);
     }
 
-    return njs_vm_value_string_set(vm, value, NULL, 0);
+    njs_value_undefined_set(value);
+
+    return NJS_OK;
 }
 
 
@@ -1620,7 +1614,8 @@ ngx_http_js_ext_get_variable(njs_vm_t *vm, njs_value_t *value, void *obj,
 
     vv = ngx_http_get_variable(r, &name, key);
     if (vv == NULL || vv->not_found) {
-        return njs_vm_value_string_set(vm, value, NULL, 0);
+        njs_value_undefined_set(value);
+        return NJS_OK;
     }
 
     return njs_vm_value_string_set(vm, value, vv->data, vv->len);
@@ -1702,10 +1697,11 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 {
     ngx_int_t                 rc;
     nxt_str_t                 uri_arg, args_arg, method_name, body_arg;
-    ngx_uint_t                cb_index, method, n, has_body;
-    njs_value_t              *arg2, *options, *value;
+    ngx_uint_t                method, n, has_body;
+    njs_value_t              *value;
     njs_function_t           *callback;
     ngx_http_js_ctx_t        *ctx;
+    const njs_value_t        *arg, *options;
     ngx_http_request_t       *r, *sr;
     ngx_http_request_body_t  *rb;
 
@@ -1734,12 +1730,7 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     static const nxt_str_t method_key = nxt_string("method");
     static const nxt_str_t body_key = nxt_string("body");
 
-    if (nargs < 2) {
-        njs_vm_error(vm, "too few arguments");
-        return NJS_ERROR;
-    }
-
-    r = njs_vm_external(vm, njs_argument(args, 0));
+    r = njs_vm_external(vm, njs_arg(args, nargs, 0));
     if (nxt_slow_path(r == NULL)) {
         return NJS_ERROR;
     }
@@ -1752,51 +1743,47 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         return NJS_ERROR;
     }
 
-    if (njs_vm_value_to_ext_string(vm, &uri_arg, njs_argument(args, 1), 0)
-        == NJS_ERROR)
-    {
+    if (ngx_http_js_string(vm, njs_arg(args, nargs, 1), &uri_arg) != NJS_OK) {
         njs_vm_error(vm, "failed to convert uri arg");
         return NJS_ERROR;
     }
 
+    if (uri_arg.length == 0) {
+        njs_vm_error(vm, "uri is empty");
+        return NJS_ERROR;
+    }
+
     options = NULL;
+    callback = NULL;
 
     method = 0;
     args_arg.length = 0;
     args_arg.start = NULL;
     has_body = 0;
 
-    if (nargs > 2 && !njs_value_is_function(njs_argument(args, 2))) {
-        arg2 = njs_argument(args, 2);
+    arg = njs_arg(args, nargs, 2);
 
-        if (njs_value_is_object(arg2)) {
-            options = arg2;
-
-        } else if (njs_value_is_string(arg2)) {
-            if (njs_vm_value_to_ext_string(vm, &args_arg, arg2, 0)
-                == NJS_ERROR)
-            {
-                njs_vm_error(vm, "failed to convert args");
-                return NJS_ERROR;
-            }
-
-        } else {
+    if (njs_value_is_string(arg)) {
+        if (njs_vm_value_to_ext_string(vm, &args_arg, arg, 0) != NJS_OK) {
             njs_vm_error(vm, "failed to convert args");
             return NJS_ERROR;
         }
 
-        cb_index = 3;
+    } else if (njs_value_is_function(arg)) {
+        callback = njs_value_function(arg);
 
-    } else {
-        cb_index = 2;
+    } else if (njs_value_is_object(arg)) {
+        options = arg;
+
+    } else if (!njs_value_is_undefined(arg)) {
+        njs_vm_error(vm, "failed to convert args");
+        return NJS_ERROR;
     }
 
     if (options != NULL) {
         value = njs_vm_object_prop(vm, options, &args_key);
         if (value != NULL) {
-            if (njs_vm_value_to_ext_string(vm, &args_arg, value, 0)
-                == NJS_ERROR)
-            {
+            if (ngx_http_js_string(vm, value, &args_arg) != NJS_OK) {
                 njs_vm_error(vm, "failed to convert options.args");
                 return NJS_ERROR;
             }
@@ -1804,9 +1791,7 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 
         value = njs_vm_object_prop(vm, options, &method_key);
         if (value != NULL) {
-            if (njs_vm_value_to_ext_string(vm, &method_name, value, 0)
-                == NJS_ERROR)
-            {
+            if (ngx_http_js_string(vm, value, &method_name) != NJS_OK) {
                 njs_vm_error(vm, "failed to convert options.method");
                 return NJS_ERROR;
             }
@@ -1833,9 +1818,7 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 
         value = njs_vm_object_prop(vm, options, &body_key);
         if (value != NULL) {
-            if (njs_vm_value_to_ext_string(vm, &body_arg, value, 0)
-                == NJS_ERROR)
-            {
+            if (ngx_http_js_string(vm, value, &body_arg) != NJS_OK) {
                 njs_vm_error(vm, "failed to convert options.body");
                 return NJS_ERROR;
             }
@@ -1844,15 +1827,15 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         }
     }
 
-    callback = NULL;
+    arg = njs_arg(args, nargs, 3);
 
-    if (cb_index < nargs) {
-        if (!njs_value_is_function(njs_argument(args, cb_index))) {
+    if (callback == NULL && !njs_value_is_undefined(arg)) {
+        if (!njs_value_is_function(arg)) {
             njs_vm_error(vm, "callback is not a function");
             return NJS_ERROR;
 
         } else {
-            callback = njs_value_function(njs_argument(args, cb_index));
+            callback = njs_value_function(arg);
         }
     }
 
@@ -2169,6 +2152,23 @@ ngx_http_js_handle_event(ngx_http_request_t *r, njs_vm_event_t vm_event,
 }
 
 
+static njs_ret_t
+ngx_http_js_string(njs_vm_t *vm, const njs_value_t *value, nxt_str_t *str)
+{
+    if (!njs_value_is_null_or_undefined(value)) {
+        if (njs_vm_value_to_ext_string(vm, str, value, 0) == NJS_ERROR) {
+            return NJS_ERROR;
+        }
+
+    } else {
+        str->start = NULL;
+        str->length = 0;
+    }
+
+    return NJS_OK;
+}
+
+
 static char *
 ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -2178,9 +2178,10 @@ ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     u_char                *start, *end;
     ssize_t                n;
     ngx_fd_t               fd;
-    ngx_str_t             *value, file;
+    ngx_str_t             *m, *value, file;
     nxt_int_t              rc;
-    nxt_str_t              text;
+    nxt_str_t              text, path;
+    ngx_uint_t             i;
     njs_vm_opt_t           options;
     ngx_file_info_t        fi;
     ngx_pool_cleanup_t    *cln;
@@ -2266,6 +2267,34 @@ ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     cln->handler = ngx_http_js_cleanup_vm;
     cln->data = jmcf->vm;
+
+    path.start = ngx_cycle->prefix.data;
+    path.length = ngx_cycle->prefix.len;
+
+    rc = njs_vm_add_path(jmcf->vm, &path);
+    if (rc != NXT_OK) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to add path");
+        return NGX_CONF_ERROR;
+    }
+
+    if (jmcf->paths != NGX_CONF_UNSET_PTR) {
+        m = jmcf->paths->elts;
+
+        for (i = 0; i < jmcf->paths->nelts; i++) {
+            if (ngx_conf_full_name(cf->cycle, &m[i], 0) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+
+            path.start = m[i].data;
+            path.length = m[i].len;
+
+            rc = njs_vm_add_path(jmcf->vm, &path);
+            if (rc != NXT_OK) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to add path");
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
 
     jmcf->req_proto = njs_vm_external_prototype(jmcf->vm,
                                                 &ngx_http_js_externals[0]);
@@ -2370,6 +2399,8 @@ ngx_http_js_create_main_conf(ngx_conf_t *cf)
      *     conf->vm = NULL;
      *     conf->req_proto = NULL;
      */
+
+    conf->paths = NGX_CONF_UNSET_PTR;
 
     return conf;
 }

@@ -15,6 +15,7 @@
 
 typedef struct {
     njs_vm_t              *vm;
+    ngx_array_t           *paths;
     const njs_extern_t    *proto;
 } ngx_stream_js_main_conf_t;
 
@@ -109,6 +110,8 @@ static void ngx_stream_js_clear_timer(njs_external_ptr_t external,
 static void ngx_stream_js_timer_handler(ngx_event_t *ev);
 static void ngx_stream_js_handle_event(ngx_stream_session_t *s,
     njs_vm_event_t vm_event, njs_value_t *args, nxt_uint_t nargs);
+static njs_ret_t ngx_stream_js_string(njs_vm_t *vm, const njs_value_t *value,
+    nxt_str_t *str);
 
 static char *ngx_stream_js_include(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
@@ -128,6 +131,13 @@ static ngx_command_t  ngx_stream_js_commands[] = {
       ngx_stream_js_include,
       NGX_STREAM_MAIN_CONF_OFFSET,
       0,
+      NULL },
+
+    { ngx_string("js_path"),
+      NGX_STREAM_MAIN_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_array_slot,
+      NGX_STREAM_MAIN_CONF_OFFSET,
+      offsetof(ngx_stream_js_main_conf_t, paths),
       NULL },
 
     { ngx_string("js_set"),
@@ -930,8 +940,9 @@ ngx_stream_js_ext_set_status(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         return NJS_ERROR;
     }
 
-    if (nargs > 1) {
-        code = njs_arg(args, nargs, 1);
+    code = njs_arg(args, nargs, 1);
+
+    if (!njs_value_is_undefined(code)) {
         if (!njs_value_is_valid_number(code)) {
             njs_vm_error(vm, "code is not a number");
             return NJS_ERROR;
@@ -1132,9 +1143,7 @@ ngx_stream_js_ext_send(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         return NJS_ERROR;
     }
 
-    if (njs_vm_value_to_ext_string(vm, &buffer, njs_arg(args, nargs, 1), 0)
-        == NJS_ERROR)
-    {
+    if (ngx_stream_js_string(vm, njs_arg(args, nargs, 1), &buffer) != NJS_OK) {
         njs_vm_error(vm, "failed to get buffer arg");
         return NJS_ERROR;
     }
@@ -1203,7 +1212,8 @@ ngx_stream_js_ext_get_variable(njs_vm_t *vm, njs_value_t *value, void *obj,
 
     vv = ngx_stream_get_variable(s, &name, key);
     if (vv == NULL || vv->not_found) {
-        return njs_vm_value_string_set(vm, value, NULL, 0);
+        njs_value_undefined_set(value);
+        return NJS_OK;
     }
 
     return njs_vm_value_string_set(vm, value, vv->data, vv->len);
@@ -1366,6 +1376,23 @@ ngx_stream_js_handle_event(ngx_stream_session_t *s, njs_vm_event_t vm_event,
 }
 
 
+static njs_ret_t
+ngx_stream_js_string(njs_vm_t *vm, const njs_value_t *value, nxt_str_t *str)
+{
+    if (!njs_value_is_null_or_undefined(value)) {
+        if (njs_vm_value_to_ext_string(vm, str, value, 0) == NJS_ERROR) {
+            return NJS_ERROR;
+        }
+
+    } else {
+        str->start = NULL;
+        str->length = 0;
+    }
+
+    return NJS_OK;
+}
+
+
 static char *
 ngx_stream_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -1375,9 +1402,10 @@ ngx_stream_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     u_char                *start, *end;
     ssize_t                n;
     ngx_fd_t               fd;
-    ngx_str_t             *value, file;
+    ngx_str_t             *m, *value, file;
     nxt_int_t              rc;
-    nxt_str_t              text;
+    nxt_str_t              text, path;
+    ngx_uint_t             i;
     njs_vm_opt_t           options;
     ngx_file_info_t        fi;
     ngx_pool_cleanup_t    *cln;
@@ -1464,6 +1492,34 @@ ngx_stream_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     cln->handler = ngx_stream_js_cleanup_vm;
     cln->data = jmcf->vm;
 
+    path.start = ngx_cycle->prefix.data;
+    path.length = ngx_cycle->prefix.len;
+
+    rc = njs_vm_add_path(jmcf->vm, &path);
+    if (rc != NXT_OK) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to add path");
+        return NGX_CONF_ERROR;
+    }
+
+    if (jmcf->paths != NGX_CONF_UNSET_PTR) {
+        m = jmcf->paths->elts;
+
+        for (i = 0; i < jmcf->paths->nelts; i++) {
+            if (ngx_conf_full_name(cf->cycle, &m[i], 0) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+
+            path.start = m[i].data;
+            path.length = m[i].len;
+
+            rc = njs_vm_add_path(jmcf->vm, &path);
+            if (rc != NXT_OK) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to add path");
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
+
     jmcf->proto = njs_vm_external_prototype(jmcf->vm,
                                             &ngx_stream_js_externals[0]);
 
@@ -1533,7 +1589,7 @@ ngx_stream_js_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static void *
 ngx_stream_js_create_main_conf(ngx_conf_t *cf)
 {
-    ngx_stream_js_srv_conf_t  *conf;
+    ngx_stream_js_main_conf_t  *conf;
 
     conf = ngx_pcalloc(cf->pool, sizeof(ngx_stream_js_main_conf_t));
     if (conf == NULL) {
@@ -1546,6 +1602,8 @@ ngx_stream_js_create_main_conf(ngx_conf_t *cf)
      *     conf->vm = NULL;
      *     conf->proto = NULL;
      */
+
+    conf->paths = NGX_CONF_UNSET_PTR;
 
     return conf;
 }
