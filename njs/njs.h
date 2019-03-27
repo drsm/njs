@@ -229,7 +229,8 @@ NXT_EXPORT njs_external_ptr_t njs_vm_external(njs_vm_t *vm,
 NXT_EXPORT void njs_disassembler(njs_vm_t *vm);
 NXT_EXPORT nxt_array_t *njs_vm_completions(njs_vm_t *vm, nxt_str_t *expression);
 
-NXT_EXPORT njs_function_t *njs_vm_function(njs_vm_t *vm, nxt_str_t *name);
+NXT_EXPORT const njs_value_t *njs_vm_value(njs_vm_t *vm, const nxt_str_t *name);
+NXT_EXPORT njs_function_t *njs_vm_function(njs_vm_t *vm, const nxt_str_t *name);
 NXT_EXPORT njs_value_t *njs_vm_retval(njs_vm_t *vm);
 NXT_EXPORT void njs_vm_retval_set(njs_vm_t *vm, const njs_value_t *value);
 
@@ -280,6 +281,11 @@ NXT_EXPORT njs_ret_t njs_vm_object_alloc(njs_vm_t *vm, njs_value_t *retval,
     ...);
 NXT_EXPORT njs_value_t *njs_vm_object_prop(njs_vm_t *vm,
     const njs_value_t *value, const nxt_str_t *key);
+
+NXT_EXPORT njs_ret_t njs_vm_json_parse(njs_vm_t *vm, njs_value_t *args,
+    nxt_uint_t nargs);
+NXT_EXPORT njs_ret_t njs_vm_json_stringify(njs_vm_t *vm, njs_value_t *args,
+    nxt_uint_t nargs);
 
 extern const nxt_mem_proto_t  njs_vm_mp_proto;
 
