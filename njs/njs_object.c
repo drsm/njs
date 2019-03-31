@@ -1217,10 +1217,11 @@ njs_object_enumerate(njs_vm_t *vm, const njs_value_t *value,
     if (nxt_fast_path(properties != 0)) {
         nxt_lvlhsh_each_init(&lhe, &njs_object_hash_proto);
 
+        hash = &value->data.u.object->hash;
+
         switch (kind) {
 
         case NJS_ENUM_KEYS:
-            hash = &value->data.u.object->hash;
             for ( ;; ) {
                 prop = nxt_lvlhsh_each(hash, &lhe);
 
@@ -1251,7 +1252,6 @@ njs_object_enumerate(njs_vm_t *vm, const njs_value_t *value,
             break;
 
         case NJS_ENUM_VALUES:
-            hash = &value->data.u.object->hash;
             for ( ;; ) {
                 prop = nxt_lvlhsh_each(hash, &lhe);
 
@@ -1610,25 +1610,15 @@ static const njs_value_t  njs_object_writable_string =
 
 
 static njs_ret_t
-njs_object_get_own_property_descriptor(njs_vm_t *vm, njs_value_t *args,
-    nxt_uint_t nargs, njs_index_t unused)
+njs_object_property_descriptor(njs_vm_t *vm, njs_value_t *dest,
+    const njs_value_t *value, const njs_value_t *property)
 {
     nxt_int_t             ret;
     njs_object_t          *descriptor;
     njs_object_prop_t     *pr, *prop;
-    const njs_value_t     *value, *property, *setval;
+    const njs_value_t     *setval;
     nxt_lvlhsh_query_t    lhq;
     njs_property_query_t  pq;
-
-    value = njs_arg(args, nargs, 1);
-
-    if (njs_is_null_or_undefined(value)) {
-        njs_type_error(vm, "cannot convert %s argument to object",
-                       njs_type_string(value->type));
-        return NXT_ERROR;
-    }
-
-    property = njs_arg(args, nargs, 2);
 
     njs_property_query_init(&pq, NJS_PROPERTY_QUERY_GET, 1);
 
@@ -1639,7 +1629,7 @@ njs_object_get_own_property_descriptor(njs_vm_t *vm, njs_value_t *args,
         break;
 
     case NXT_DECLINED:
-        vm->retval = njs_value_undefined;
+        *dest = njs_value_undefined;
         return NXT_OK;
 
     case NJS_TRAP:
@@ -1764,7 +1754,96 @@ njs_object_get_own_property_descriptor(njs_vm_t *vm, njs_value_t *args,
         return NXT_ERROR;
     }
 
-    vm->retval.data.u.object = descriptor;
+    dest->data.u.object = descriptor;
+    dest->type = NJS_OBJECT;
+    dest->data.truth = 1;
+
+    return NXT_OK;
+}
+
+
+static njs_ret_t
+njs_object_get_own_property_descriptor(njs_vm_t *vm, njs_value_t *args,
+    nxt_uint_t nargs, njs_index_t unused)
+{
+    const njs_value_t  *value, *property;
+
+    value = njs_arg(args, nargs, 1);
+
+    if (njs_is_null_or_undefined(value)) {
+        njs_type_error(vm, "cannot convert %s argument to object",
+                       njs_type_string(value->type));
+        return NXT_ERROR;
+    }
+
+    property = njs_arg(args, nargs, 2);
+
+    return njs_object_property_descriptor(vm, &vm->retval, value, property);
+}
+
+
+static njs_ret_t
+njs_object_get_own_property_descriptors(njs_vm_t *vm, njs_value_t *args,
+    nxt_uint_t nargs, njs_index_t unused)
+{
+    njs_ret_t           ret;
+    uint32_t            i, length;
+    njs_array_t         *names;
+    njs_value_t         descriptor;
+    njs_object_t        *descriptors;
+    const njs_value_t   *value, *key;
+    njs_object_prop_t   *pr;
+    nxt_lvlhsh_query_t  lhq;
+
+    value = njs_arg(args, nargs, 1);
+
+    if (njs_is_null_or_undefined(value)) {
+        njs_type_error(vm, "cannot convert %s argument to object",
+                       njs_type_string(value->type));
+
+        return NXT_ERROR;
+    }
+
+    names = njs_object_enumerate(vm, value, NJS_ENUM_KEYS, 1);
+    if (nxt_slow_path(names == NULL)) {
+        return NXT_ERROR;
+    }
+
+    length = names->length;
+
+    descriptors = njs_object_alloc(vm);
+    if (nxt_slow_path(descriptors == NULL)) {
+        return NXT_ERROR;
+    }
+
+    lhq.replace = 0;
+    lhq.pool = vm->mem_pool;
+    lhq.proto = &njs_object_hash_proto;
+
+    for (i = 0; i < length; i++) {
+        key = &names->start[i];
+        ret = njs_object_property_descriptor(vm, &descriptor, value, key);
+        if (nxt_slow_path(ret != NXT_OK)) {
+            return ret;
+        }
+
+        pr = njs_object_prop_alloc(vm, key, &descriptor, 1);
+        if (nxt_slow_path(pr == NULL)) {
+            return NXT_ERROR;
+        }
+
+        njs_string_get(key, &lhq.key);
+        lhq.key_hash = nxt_djb_hash(lhq.key.start, lhq.key.length);
+        lhq.value = pr;
+
+        ret = nxt_lvlhsh_insert(&descriptors->hash, &lhq);
+        if (nxt_slow_path(ret != NXT_OK)) {
+            njs_internal_error(vm, "lvlhsh insert failed");
+            return NXT_ERROR;
+        }
+    }
+
+    vm->retval.data.u.object = descriptors;
     vm->retval.type = NJS_OBJECT;
     vm->retval.data.truth = 1;
 
@@ -2231,6 +2310,14 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .value = njs_native_function(njs_object_get_own_property_descriptor, 0,
                                      NJS_SKIP_ARG, NJS_SKIP_ARG,
                                      NJS_STRING_ARG),
+    },
+
+    /* Object.getOwnPropertyDescriptors(). */
+    {
+        .type = NJS_METHOD,
+        .name = njs_long_string("getOwnPropertyDescriptors"),
+        .value = njs_native_function(njs_object_get_own_property_descriptors, 0,
+                                     NJS_SKIP_ARG, NJS_OBJECT_ARG),
     },
 
     /* Object.getOwnPropertyNames(). */
