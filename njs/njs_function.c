@@ -9,7 +9,7 @@
 
 
 static njs_function_t *njs_function_copy(njs_vm_t *vm,
-    const njs_function_t *function);
+    njs_function_t *function);
 static njs_native_frame_t *njs_function_frame_alloc(njs_vm_t *vm, size_t size);
 static njs_ret_t njs_normalize_args(njs_vm_t *vm, njs_value_t *args,
     uint8_t *args_types, nxt_uint_t nargs);
@@ -93,11 +93,20 @@ njs_function_value_copy(njs_vm_t *vm, njs_value_t *value)
 }
 
 
+nxt_inline njs_closure_t **
+njs_function_closures(njs_vm_t *vm, njs_function_t *function)
+{
+    return (function->closure) ? function->closures
+                               : vm->active_frame->closures;
+}
+
+
 static njs_function_t *
-njs_function_copy(njs_vm_t *vm, const njs_function_t *function)
+njs_function_copy(njs_vm_t *vm, njs_function_t *function)
 {
     size_t          size;
     nxt_uint_t      n, nesting;
+    njs_closure_t   **closures;
     njs_function_t  *copy;
 
     nesting = (function->native) ? 0 : function->u.lambda->nesting;
@@ -106,7 +115,6 @@ njs_function_copy(njs_vm_t *vm, const njs_function_t *function)
 
     copy = nxt_mp_alloc(vm->mem_pool, size);
     if (nxt_slow_path(copy == NULL)) {
-        njs_memory_error(vm);
         return NULL;
     }
 
@@ -120,11 +128,13 @@ njs_function_copy(njs_vm_t *vm, const njs_function_t *function)
 
     copy->closure = 1;
 
+    closures = njs_function_closures(vm, function);
+
     n = 0;
 
     do {
         /* GC: retain closure. */
-        copy->closures[n] = vm->active_frame->closures[n];
+        copy->closures[n] = closures[n];
         n++;
     } while (n < nesting);
 
@@ -470,8 +480,7 @@ njs_function_lambda_call(njs_vm_t *vm, njs_index_t retval,
     nesting = lambda->nesting;
 
     if (nesting != 0) {
-        closures = (function->closure) ? function->closures
-                                       : vm->active_frame->closures;
+        closures = njs_function_closures(vm, function);
         do {
             closure = *closures++;
 
