@@ -1874,6 +1874,7 @@ njs_json_append_string(njs_json_stringify_t *stringify,
     }
 
     njs_json_buf_written(stringify, dst - stringify->last->pos);
+
     njs_json_buf_append(stringify, &quote, 1);
 
     return NXT_OK;
@@ -2114,7 +2115,8 @@ const njs_object_init_t  njs_json_object_init = {
 
 
 static nxt_int_t
-njs_dump_value(njs_json_stringify_t *stringify, const njs_value_t *value)
+njs_dump_value(njs_json_stringify_t *stringify, const njs_value_t *value,
+    nxt_uint_t console)
 {
     njs_ret_t           ret;
     nxt_str_t           str;
@@ -2139,7 +2141,14 @@ njs_dump_value(njs_json_stringify_t *stringify, const njs_value_t *value)
 
     case NJS_STRING:
         njs_string_get(value, &str);
-        return njs_json_append_string(stringify, value, '\'');
+
+        if (!console || stringify->stack.items != 0) {
+            return njs_json_append_string(stringify, value, '\'');
+        }
+
+        return njs_json_buf_append(stringify, (char *) str.start, str.length);
+
+        break;
 
     case NJS_OBJECT_NUMBER:
         value = &value->data.u.object_value->value;
@@ -2314,7 +2323,7 @@ memory_error:
 
 #define njs_dump_append_value(value)                                          \
     state->written = 1;                                                       \
-    ret = njs_dump_value(stringify, value);                                   \
+    ret = njs_dump_value(stringify, value, console);                          \
     if (nxt_slow_path(ret != NXT_OK)) {                                       \
         if (ret == NXT_DECLINED) {                                            \
             goto exception;                                                   \
@@ -2326,7 +2335,7 @@ memory_error:
 
 njs_ret_t
 njs_vm_value_dump(njs_vm_t *vm, nxt_str_t *retval, const njs_value_t *value,
-    nxt_uint_t indent)
+    nxt_uint_t console, nxt_uint_t indent)
 {
     nxt_int_t             i;
     njs_ret_t             ret;
@@ -2351,9 +2360,10 @@ njs_vm_value_dump(njs_vm_t *vm, nxt_str_t *retval, const njs_value_t *value,
     stringify->pool = vm->mem_pool;
     stringify->nodes = NULL;
     stringify->last = NULL;
+    stringify->stack.items = 0;
 
     if (!njs_dump_is_object(value)) {
-        ret = njs_dump_value(stringify, value);
+        ret = njs_dump_value(stringify, value, console);
         if (nxt_slow_path(ret != NXT_OK)) {
             goto memory_error;
         }
