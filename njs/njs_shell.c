@@ -35,6 +35,7 @@ typedef struct {
     nxt_int_t               interactive;
     nxt_int_t               sandbox;
     nxt_int_t               quiet;
+    nxt_int_t               module;
 } njs_opts_t;
 
 
@@ -227,27 +228,28 @@ main(int argc, char **argv)
 
     nxt_memzero(&vm_options, sizeof(njs_vm_opt_t));
 
-    if (!opts.quiet) {
-        if (opts.file == NULL) {
-            p = getcwd(path, sizeof(path));
-            if (p == NULL) {
-                nxt_error("getcwd() failed:%s\n", strerror(errno));
-                ret = NXT_ERROR;
-                goto done;
-            }
-
-            memcpy(path + nxt_strlen(path), "/shell", sizeof("/shell"));
-            opts.file = path;
+    if (opts.file == NULL) {
+        p = getcwd(path, sizeof(path));
+        if (p == NULL) {
+            nxt_error("getcwd() failed:%s\n", strerror(errno));
+            ret = NXT_ERROR;
+            goto done;
         }
 
-        vm_options.file.start = (u_char *) opts.file;
-        vm_options.file.length = nxt_strlen(opts.file);
+        memcpy(path + nxt_strlen(path), "/shell", sizeof("/shell"));
+        opts.file = path;
     }
+
+    vm_options.file.start = (u_char *) opts.file;
+    vm_options.file.length = nxt_strlen(opts.file);
 
     vm_options.init = !opts.interactive;
     vm_options.accumulative = opts.interactive;
     vm_options.backtrace = 1;
+    vm_options.quiet = opts.quiet;
     vm_options.sandbox = opts.sandbox;
+    vm_options.module = opts.module;
+
     vm_options.ops = &njs_console_ops;
     vm_options.external = &njs_console;
 
@@ -278,12 +280,13 @@ njs_get_options(njs_opts_t *opts, int argc, char** argv)
         "Interactive njs shell.\n"
         "\n"
         "Options:\n"
-        "  -d              print disassembled code.\n"
-        "  -q              disable interactive introduction prompt.\n"
-        "  -s              sandbox mode.\n"
-        "  -p              set path prefix for modules.\n"
-        "  -v              print njs version and exit.\n"
-        "  <filename> | -  run code from a file or stdin.\n";
+        "  -d                print disassembled code.\n"
+        "  -q                disable interactive introduction prompt.\n"
+        "  -s                sandbox mode.\n"
+        "  -t script|module  source code type (script is default).\n"
+        "  -p                set path prefix for modules.\n"
+        "  -v                print njs version and exit.\n"
+        "  <filename> | -    run code from a file or stdin.\n";
 
     ret = NXT_DONE;
 
@@ -317,8 +320,25 @@ njs_get_options(njs_opts_t *opts, int argc, char** argv)
             opts->sandbox = 1;
             break;
 
+        case 't':
+            if (++i < argc) {
+                if (strcmp(argv[i], "module") == 0) {
+                    opts->module = 1;
+
+                } else if (strcmp(argv[i], "script") != 0) {
+                    nxt_error("option \"-t\" unexpected source type: %s\n",
+                              argv[i]);
+                    return NXT_ERROR;
+                }
+
+                break;
+            }
+
+            nxt_error("option \"-t\" requires source type\n");
+            return NXT_ERROR;
+
         case 'p':
-            if (argv[++i] != NULL) {
+            if (++i < argc) {
                 opts->n_paths++;
                 paths = realloc(opts->paths, opts->n_paths * sizeof(char *));
                 if (paths == NULL) {

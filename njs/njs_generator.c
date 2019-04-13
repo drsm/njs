@@ -382,7 +382,6 @@ njs_generator(njs_vm_t *vm, njs_generator_t *generator, njs_parser_node_t *node)
     case NJS_TOKEN_NUMBER:
     case NJS_TOKEN_STRING:
         node->index = njs_value_index(vm, &node->u.value, generator->runtime);
-
         if (nxt_fast_path(node->index != NJS_INDEX_NONE)) {
             return NXT_OK;
         }
@@ -428,9 +427,22 @@ njs_generator(njs_vm_t *vm, njs_generator_t *generator, njs_parser_node_t *node)
 
     case NJS_TOKEN_NAME:
     case NJS_TOKEN_ARGUMENTS:
+    case NJS_TOKEN_NON_LOCAL_THIS:
         return njs_generate_name(vm, generator, node);
 
     case NJS_TOKEN_GLOBAL_THIS:
+        if (vm->options.module) {
+            node->index = njs_value_index(vm, &node->u.value,
+                                          generator->runtime);
+            if (nxt_fast_path(node->index != NJS_INDEX_NONE)) {
+                return NXT_OK;
+            }
+
+            return NXT_ERROR;
+        }
+
+        /* Fall through. */
+
     case NJS_TOKEN_NJS:
     case NJS_TOKEN_MATH:
     case NJS_TOKEN_JSON:
@@ -835,7 +847,7 @@ njs_generate_switch_statement(njs_vm_t *vm, njs_generator_t *generator,
     }
 
     ret = njs_generate_start_block(vm, generator, NJS_GENERATOR_SWITCH,
-                                   &swtch->label);
+                                   &swtch->name);
     if (nxt_slow_path(ret != NXT_OK)) {
         return ret;
     }
@@ -954,7 +966,7 @@ njs_generate_while_statement(njs_vm_t *vm, njs_generator_t *generator,
     /* The loop body. */
 
     ret = njs_generate_start_block(vm, generator, NJS_GENERATOR_LOOP,
-                                   &node->label);
+                                   &node->name);
     if (nxt_slow_path(ret != NXT_OK)) {
         return ret;
     }
@@ -1002,7 +1014,7 @@ njs_generate_do_while_statement(njs_vm_t *vm, njs_generator_t *generator,
     /* The loop body. */
 
     ret = njs_generate_start_block(vm, generator, NJS_GENERATOR_LOOP,
-                                   &node->label);
+                                   &node->name);
     if (nxt_slow_path(ret != NXT_OK)) {
         return ret;
     }
@@ -1047,7 +1059,7 @@ njs_generate_for_statement(njs_vm_t *vm, njs_generator_t *generator,
     njs_vmcode_cond_jump_t  *cond_jump;
 
     ret = njs_generate_start_block(vm, generator, NJS_GENERATOR_LOOP,
-                                   &node->label);
+                                   &node->name);
     if (nxt_slow_path(ret != NXT_OK)) {
         return ret;
     }
@@ -1150,7 +1162,7 @@ njs_generate_for_in_statement(njs_vm_t *vm, njs_generator_t *generator,
     njs_vmcode_prop_foreach_t  *prop_foreach;
 
     ret = njs_generate_start_block(vm, generator, NJS_GENERATOR_LOOP,
-                                   &node->label);
+                                   &node->name);
     if (nxt_slow_path(ret != NXT_OK)) {
         return ret;
     }
@@ -1429,7 +1441,7 @@ njs_generate_continue_statement(njs_vm_t *vm, njs_generator_t *generator,
     njs_generator_patch_t  *patch;
     njs_generator_block_t  *block;
 
-    label = &node->label;
+    label = &node->name;
 
     block = njs_generate_find_block(generator->block, NJS_GENERATOR_LOOP,
                                     label);
@@ -1477,7 +1489,7 @@ njs_generate_break_statement(njs_vm_t *vm, njs_generator_t *generator,
     njs_generator_patch_t  *patch;
     njs_generator_block_t  *block;
 
-    label = &node->label;
+    label = &node->name;
 
     block = njs_generate_find_block(generator->block, NJS_GENERATOR_ALL, label);
     if (nxt_slow_path(block == NULL)) {
@@ -1536,7 +1548,7 @@ njs_generate_block_statement(njs_vm_t *vm, njs_generator_t *generator,
     nxt_int_t  ret;
 
     ret = njs_generate_start_block(vm, generator, NJS_GENERATOR_BLOCK,
-                                   &node->label);
+                                   &node->name);
     if (nxt_slow_path(ret != NXT_OK)) {
         return ret;
     }
@@ -2403,6 +2415,7 @@ njs_generate_lambda_variables(njs_vm_t *vm, njs_generator_t *generator,
     njs_variable_t          *var;
     njs_vmcode_move_t       *move;
     nxt_lvlhsh_each_t       lhe;
+    njs_vmcode_this_t       *this;
     njs_vmcode_arguments_t  *arguments;
 
     nxt_lvlhsh_each_init(&lhe, &njs_variables_hash_proto);
@@ -2418,6 +2431,12 @@ njs_generate_lambda_variables(njs_vm_t *vm, njs_generator_t *generator,
             index = njs_scope_index((var->argument - 1), NJS_SCOPE_ARGUMENTS);
 
             njs_generate_code_move(generator, move, var->index, index);
+        }
+
+        if (var->this_object) {
+            njs_generate_code(generator, njs_vmcode_this_t, this,
+                              njs_vmcode_this, 1, 0);
+            this->dst = var->index;
         }
 
         if (var->arguments_object) {
@@ -3227,7 +3246,14 @@ njs_generate_function_debug(njs_vm_t *vm, const nxt_str_t *name,
 
     debug->lambda = lambda;
     debug->line = node->token_line;
-    debug->file = node->scope->file;
+
+    if (!vm->options.quiet) {
+        debug->file = node->scope->file;
+
+    } else {
+        debug->file = nxt_string_value("");
+    }
+
     debug->name = (name != NULL) ? *name : no_label;
 
     return NXT_OK;

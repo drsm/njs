@@ -658,6 +658,20 @@ njs_test {
      "undefined\r\n"}
 } "-s"
 
+# source type
+
+njs_test {
+    {"this\r\n"
+     "this\r\nundefined"}
+    {"(() => this)()\r\n"
+     "(() => this)()\r\nundefined"}
+} "-t module"
+
+njs_test {
+    {"this.NaN\r\n"
+     "this.NaN\r\nNaN"}
+} "-t script"
+
 # modules
 
 njs_test {
@@ -700,6 +714,9 @@ njs_test {
     {"m.prod(3,4)\r\n"
      "12\r\n"}
 } "-p njs/test/module/"
+
+njs_run "-q ./njs/test/module/normal.js" \
+        "SyntaxError: Cannot find module \"hash.js\" in 5"
 
 njs_run "-p njs/test/module/libs/ -d ./njs/test/module/normal.js" \
         "passed!"

@@ -3134,7 +3134,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("var a = [1,2]; delete a.length"),
-      nxt_string("false") },
+      nxt_string("TypeError: Cannot delete property \"length\" of array") },
 
     { nxt_string("var a = [1,2,3]; a.x = 10;  delete a[1]"),
       nxt_string("true") },
@@ -5638,6 +5638,12 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("String.bytesFrom('QUJDRA#', 'base64url')"),
       nxt_string("ABCD") },
 
+    { nxt_string("encodeURI.name"),
+      nxt_string("encodeURI")},
+
+    { nxt_string("encodeURI.length"),
+      nxt_string("1")},
+
     { nxt_string("encodeURI()"),
       nxt_string("undefined")},
 
@@ -5647,8 +5653,20 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("encodeURI('~}|{`_^]\\\\[@?>=<;:/.-,+*)(\\\'&%$#\"! ')"),
       nxt_string("~%7D%7C%7B%60_%5E%5D%5C%5B@?%3E=%3C;:/.-,+*)('&%25$#%22!%20")},
 
+    { nxt_string("encodeURIComponent.name"),
+      nxt_string("encodeURIComponent")},
+
+    { nxt_string("encodeURIComponent.length"),
+      nxt_string("1")},
+
     { nxt_string("encodeURIComponent('~}|{`_^]\\\\[@?>=<;:/.-,+*)(\\\'&%$#\"! ')"),
       nxt_string("~%7D%7C%7B%60_%5E%5D%5C%5B%40%3F%3E%3D%3C%3B%3A%2F.-%2C%2B*)('%26%25%24%23%22!%20")},
+
+    { nxt_string("decodeURI.name"),
+      nxt_string("decodeURI")},
+
+    { nxt_string("decodeURI.length"),
+      nxt_string("1")},
 
     { nxt_string("decodeURI()"),
       nxt_string("undefined")},
@@ -5670,6 +5688,12 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("decodeURI('%7e%7d%7c%7b%60%5f%5e%5d%5c%5b%40%3f%3e%3d%3c%3b%3a%2f%2e%2c%2b%2a%29%28%27%26%25%24%23%22%21%20')"),
       nxt_string("~}|{`_^]\\[%40%3f>%3d<%3b%3a%2f.%2c%2b*)('%26%%24%23\"! ")},
+
+    { nxt_string("decodeURIComponent.name"),
+      nxt_string("decodeURIComponent")},
+
+    { nxt_string("decodeURIComponent.length"),
+      nxt_string("1")},
 
     { nxt_string("decodeURIComponent('%7e%7d%7c%7b%60%5f%5e%5d%5c%5b%40%3f%3e%3d%3c%3b%3a%2f%2e%2c%2b%2a%29%28%27%26%25%24%23%22%21%20')"),
       nxt_string("~}|{`_^]\\[@?>=<;:/.,+*)('&%$#\"! ")},
@@ -6502,6 +6526,12 @@ static njs_unit_test_t  njs_test[] =
 
     /* arguments object. */
 
+    { nxt_string("arguments"),
+      nxt_string("SyntaxError: \"arguments\" object in global scope in 1") },
+
+    { nxt_string("{arguments}"),
+      nxt_string("SyntaxError: \"arguments\" object in global scope in 1") },
+
     { nxt_string("var arguments"),
       nxt_string("SyntaxError: Identifier \"arguments\" is forbidden in var declaration in 1") },
 
@@ -6600,6 +6630,138 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("function myFoo(a,b,...other) { return other };"
                  "myFoo(1,2);" ),
       nxt_string("") },
+
+    /* arrow functions. */
+
+    { nxt_string("()"),
+      nxt_string("SyntaxError: Unexpected token \")\" in 1") },
+
+    { nxt_string("() => "),
+      nxt_string("SyntaxError: Unexpected end of input in 1") },
+
+    { nxt_string("() => {"),
+      nxt_string("SyntaxError: Unexpected end of input in 1") },
+
+    { nxt_string("a\n => 1"),
+      nxt_string("SyntaxError: Unexpected token \"=>\" in 2") },
+
+    { nxt_string("new (()=>1)"),
+      nxt_string("TypeError: function is not a constructor")},
+
+    { nxt_string("(\n) => {}"),
+      nxt_string("[object Function]") },
+
+    { nxt_string("a => 1"),
+      nxt_string("[object Function]") },
+
+    { nxt_string("({f:()=>1, g:()=>2}).f()"),
+      nxt_string("1") },
+
+    { nxt_string("var f = f => {return 1;}; f()"),
+      nxt_string("1") },
+
+    { nxt_string("var f = (f) => {return 1;}; f()"),
+      nxt_string("1") },
+
+    { nxt_string("var f = (f, a, b) => {return 1;}; f()"),
+      nxt_string("1") },
+
+    { nxt_string("var f = () => {return 1;}; f()"),
+      nxt_string("1") },
+
+    { nxt_string("(f => {return 1;})()"),
+      nxt_string("1") },
+
+    { nxt_string("((f) => {return 1;})()"),
+      nxt_string("1") },
+
+    { nxt_string("(((f) => {return 1;}))()"),
+      nxt_string("1") },
+
+    { nxt_string("var f = f => 1; f()"),
+      nxt_string("1") },
+
+    { nxt_string("() => 1"),
+      nxt_string("[object Function]") },
+
+    { nxt_string("var f = ()=>{}; f()"),
+      nxt_string("undefined") },
+
+    { nxt_string("var f = ()=>({}); f()"),
+      nxt_string("[object Object]") },
+
+    { nxt_string("var materials = ['Hydrogen', 'Helium', 'Lithium', 'Beryllium'];"
+                 "materials.map(material => { return material.length; });"),
+      nxt_string("8,6,7,9") },
+
+    { nxt_string("var materials = ['Hydrogen', 'Helium', 'Lithium', 'Beryllium'];"
+                 "materials.map(material => material.length);"),
+      nxt_string("8,6,7,9") },
+
+    { nxt_string("var materials = ['Hydrogen', 'Helium', 'Lithium', 'Beryllium'];"
+                 "materials.map(material => { material.length });"),
+      nxt_string(",,,") },
+
+    { nxt_string("function f(a, b, c) {a = 1; return () => { return arguments[1]; };};"
+                 "f(1, 2, 3)('a', 'b');"),
+      nxt_string("2") },
+
+    { nxt_string("var f = (...c) => { return (function() { return arguments.length; }).bind(null, c); };"
+                 "var x = f(1,'a',false, {}); x()"),
+      nxt_string("1") },
+
+    { nxt_string("var f = (...c) => { return (function() { return arguments.length; }).bind(null, c); };"
+                 "var x = f(1,'a',false, {}); x(1,2,3)"),
+      nxt_string("4") },
+
+    { nxt_string("function Car(){ this.age = 0; (() => { this.age++;})();}"
+                 "(new Car()).age"),
+      nxt_string("1") },
+
+    { nxt_string("function Car(){ this.age = 0; (function(){ this.age++;})();}"
+                 "(new Car()).age"),
+      nxt_string("TypeError: cannot get property \"age\" of undefined") },
+
+    /* arrow functions + global this. */
+
+    { nxt_string("(() => this)()"),
+      nxt_string("[object Object]") },
+
+    { nxt_string("(() => this).call('abc')"),
+      nxt_string("[object Object]") },
+
+    { nxt_string("(() => this).apply('abc')"),
+      nxt_string("[object Object]") },
+
+    { nxt_string("(() => this).bind('abc')()"),
+      nxt_string("[object Object]") },
+
+    { nxt_string("(function() { return (() => this); })()()"),
+      nxt_string("undefined") },
+
+    { nxt_string("(function() { return (() => this); }).call('abc')()"),
+      nxt_string("abc") },
+
+    { nxt_string("(function() { return (() => this); }).bind('abc')()()"),
+      nxt_string("abc") },
+
+    { nxt_string("(function() { return (() => this); })"
+                 ".call('abc').call('bca')"),
+      nxt_string("abc") },
+
+    { nxt_string("(function() { return (() => this); })"
+                 ".call('abc').bind('bca')()"),
+      nxt_string("abc") },
+
+    { nxt_string("(function() { return function() { return () => this; }; })"
+                 ".call('bca').call('abc')()"),
+      nxt_string("abc") },
+
+     { nxt_string("var f = () => 1; f.prototype"),
+       nxt_string("undefined") },
+
+     { nxt_string("var f = (a,b) => 0; f.length"),
+       nxt_string("2") },
 
     /* Scopes. */
 
@@ -7544,6 +7706,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("this.NaN + 1"),
       nxt_string("NaN") },
 
+    { nxt_string("{this}"),
+      nxt_string("undefined") },
+
     { nxt_string("if (1) {new this}"),
       nxt_string("TypeError: object is not a function") },
 
@@ -7615,6 +7780,9 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("Object.prototype"),
       nxt_string("[object Object]") },
+
+    { nxt_string("Object.prototype.valueOf.prototype"),
+      nxt_string("undefined") },
 
     { nxt_string("Object.constructor === Function"),
       nxt_string("true") },
@@ -7699,6 +7867,9 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("Array.prototype"),
       nxt_string("") },
+
+    { nxt_string("Array.prototype.length"),
+      nxt_string("0") },
 
     { nxt_string("Array.constructor === Function"),
       nxt_string("true") },
@@ -8131,6 +8302,9 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("Function.prototype"),
       nxt_string("[object Function]") },
+
+    { nxt_string("Function.prototype.length"),
+      nxt_string("0") },
 
     { nxt_string("Function.constructor === Function"),
       nxt_string("true") },
@@ -8801,10 +8975,10 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("a,b") },
 
     { nxt_string("Object.getOwnPropertyNames(Object.defineProperty([], 'b', {}))"),
-      nxt_string("length,b") },
+      nxt_string("b,length") },
 
     { nxt_string("Object.getOwnPropertyNames(Object.defineProperty(new String(), 'b', {}))"),
-      nxt_string("length,b") },
+      nxt_string("b,length") },
 
     { nxt_string("Object.getOwnPropertyNames([1,2,3])"),
       nxt_string("0,1,2,length") },
@@ -10483,6 +10657,12 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("isNaN"),
       nxt_string("[object Function]") },
 
+    { nxt_string("isNaN.name"),
+      nxt_string("isNaN") },
+
+    { nxt_string("isNaN.length"),
+      nxt_string("1") },
+
     { nxt_string("isNaN()"),
       nxt_string("true") },
 
@@ -10501,6 +10681,12 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("isFinite"),
       nxt_string("[object Function]") },
 
+    { nxt_string("isFinite.name"),
+      nxt_string("isFinite") },
+
+    { nxt_string("isFinite.length"),
+      nxt_string("1") },
+
     { nxt_string("isFinite()"),
       nxt_string("false") },
 
@@ -10515,6 +10701,12 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("isFinite('abc')"),
       nxt_string("false") },
+
+    { nxt_string("parseInt.name"),
+      nxt_string("parseInt") },
+
+    { nxt_string("parseInt.length"),
+      nxt_string("2") },
 
     { nxt_string("parseInt('12345abc')"),
       nxt_string("12345") },
@@ -10566,6 +10758,12 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("parseInt('0', 37)"),
       nxt_string("NaN") },
+
+    { nxt_string("parseFloat.name"),
+      nxt_string("parseFloat") },
+
+    { nxt_string("parseFloat.length"),
+      nxt_string("1") },
 
     { nxt_string("parseFloat('12345abc')"),
       nxt_string("12345") },

@@ -638,6 +638,12 @@ typedef struct {
 
 
 typedef struct {
+     njs_vmcode_t              code;
+     njs_index_t               dst;
+} njs_vmcode_this_t;
+
+
+typedef struct {
     njs_vmcode_t               code;
     njs_index_t                dst;
 } njs_vmcode_arguments_t;
@@ -1078,6 +1084,8 @@ struct njs_vm_s {
      */
     njs_object_t             memory_error_object;
 
+    njs_object_t             string_object;
+
     nxt_array_t              *code;  /* of njs_vm_code_t */
 
     nxt_trace_t              trace;
@@ -1108,9 +1116,13 @@ typedef struct {
 struct njs_vm_shared_s {
     nxt_lvlhsh_t             keywords_hash;
     nxt_lvlhsh_t             values_hash;
-    nxt_lvlhsh_t             function_prototype_hash;
-    nxt_lvlhsh_t             arguments_object_hash;
+    nxt_lvlhsh_t             array_instance_hash;
+    nxt_lvlhsh_t             string_instance_hash;
+    nxt_lvlhsh_t             function_instance_hash;
+    nxt_lvlhsh_t             arrow_instance_hash;
+    nxt_lvlhsh_t             arguments_object_instance_hash;
 
+    njs_object_t             string_object;
     njs_object_t             objects[NJS_OBJECT_MAX];
     njs_function_t           functions[NJS_FUNCTION_MAX];
 
@@ -1135,6 +1147,8 @@ njs_ret_t njs_vmcode_object(njs_vm_t *vm, njs_value_t *inlvd1,
 njs_ret_t njs_vmcode_array(njs_vm_t *vm, njs_value_t *inlvd1,
     njs_value_t *inlvd2);
 njs_ret_t njs_vmcode_function(njs_vm_t *vm, njs_value_t *inlvd1,
+    njs_value_t *invld2);
+njs_ret_t njs_vmcode_this(njs_vm_t *vm, njs_value_t *inlvd1,
     njs_value_t *invld2);
 njs_ret_t njs_vmcode_arguments(njs_vm_t *vm, njs_value_t *inlvd1,
     njs_value_t *invld2);

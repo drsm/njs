@@ -32,6 +32,7 @@ struct njs_parser_scope_s {
     uint8_t                         nesting;     /* 4 bits */
     uint8_t                         argument_closures;
     uint8_t                         module;
+    uint8_t                         arrow_function;
 };
 
 
@@ -39,6 +40,7 @@ struct njs_parser_node_s {
     njs_token_t                     token:16;
     uint8_t                         ctor:1;
     uint8_t                         temporary;    /* 1 bit  */
+    uint8_t                         hoist;        /* 1 bit  */
     uint32_t                        token_line;
 
     union {
@@ -49,7 +51,7 @@ struct njs_parser_node_s {
         njs_parser_node_t           *object;
     } u;
 
-    nxt_str_t                       label;
+    nxt_str_t                       name;
 
     njs_index_t                     index;
 
@@ -81,6 +83,10 @@ njs_token_t njs_parser_expression(njs_vm_t *vm, njs_parser_t *parser,
 njs_token_t njs_parser_assignment_expression(njs_vm_t *vm,
     njs_parser_t *parser, njs_token_t token);
 njs_token_t njs_parser_function_expression(njs_vm_t *vm, njs_parser_t *parser);
+nxt_int_t njs_parser_match_arrow_expression(njs_vm_t *vm, njs_parser_t *parser,
+    njs_token_t token);
+njs_token_t njs_parser_arrow_expression(njs_vm_t *vm, njs_parser_t *parser,
+    njs_token_t token);
 njs_token_t njs_parser_module_lambda(njs_vm_t *vm, njs_parser_t *parser);
 njs_token_t njs_parser_terminal(njs_vm_t *vm, njs_parser_t *parser,
     njs_token_t token);
@@ -222,6 +228,23 @@ njs_parser_global_scope(njs_vm_t *vm)
     }
 
     return scope;
+}
+
+
+nxt_inline njs_parser_scope_t *
+njs_function_scope(njs_parser_scope_t *scope, nxt_bool_t any)
+{
+    while (scope->type != NJS_SCOPE_GLOBAL) {
+        if (scope->type == NJS_SCOPE_FUNCTION
+            && (any || !scope->arrow_function))
+        {
+            return scope;
+        }
+
+        scope = scope->parent;
+    }
+
+    return NULL;
 }
 
 
