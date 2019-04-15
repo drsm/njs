@@ -3617,7 +3617,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: Cannot convert object to primitive value") },
 
     { nxt_string("Array.prototype.slice.call({length:-1})"),
-      nxt_string("MemoryError") },
+      nxt_string("") },
 
     { nxt_string("Array.prototype.slice.call('αβZγ')"),
       nxt_string("α,β,Z,γ") },
@@ -6412,6 +6412,16 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("function f() { var a = 1; function baz() { return a; } return baz; } f().bind()()"),
       nxt_string("1") },
+
+    { nxt_string("function f() { var t = 1; function baz() { return t; } return baz; }"
+                 "f().bind()();"),
+      nxt_string("1") },
+
+    { nxt_string("(function(a) { var s = typeof g, q = g; var g = 1; s += typeof g; function g(b) { return a + b }; return q; })(1)(2)"),
+      nxt_string("3")},
+
+    { nxt_string("(function(a) { var g = f; var f = 1; function f() { return a; } return g; })(42)()"),
+      nxt_string("42") },
 
     { nxt_string("function f(a, b) { return a + b }"
                  "f(3,4) === f.bind()(3,4)"),
