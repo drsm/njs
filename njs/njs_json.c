@@ -1127,7 +1127,7 @@ njs_json_push_parse_state(njs_vm_t *vm, njs_json_parse_t *parse,
         } else {
             state->type = NJS_JSON_OBJECT_START;
             state->prop_value = NULL;
-            state->keys = njs_object_enumerate(vm, value, NJS_ENUM_KEYS, 0);
+            state->keys = njs_value_own_enumerate(vm, value, NJS_ENUM_KEYS, 0);
             if (state->keys == NULL) {
                 return NULL;
             }
@@ -1705,7 +1705,8 @@ njs_json_push_stringify_state(njs_vm_t *vm, njs_json_stringify_t *stringify,
                 state->keys = njs_extern_keys_array(vm, value->external.proto);
 
             } else {
-                state->keys = njs_object_enumerate(vm, value, NJS_ENUM_KEYS, 0);
+                state->keys = njs_value_own_enumerate(vm, value, NJS_ENUM_KEYS,
+                                                      0);
             }
 
             if (state->keys == NULL) {
@@ -1961,14 +1962,16 @@ njs_json_buf_append(njs_json_stringify_t *stringify, const char *msg,
 {
     u_char  *p;
 
-    p = njs_json_buf_reserve(stringify, len);
-    if (nxt_slow_path(p == NULL)) {
-        return NXT_ERROR;
+    if (len != 0) {
+        p = njs_json_buf_reserve(stringify, len);
+        if (nxt_slow_path(p == NULL)) {
+            return NXT_ERROR;
+        }
+
+        memcpy(p, msg, len);
+
+        njs_json_buf_written(stringify, len);
     }
-
-    memcpy(p, msg, len);
-
-    njs_json_buf_written(stringify, len);
 
     return NXT_OK;
 }

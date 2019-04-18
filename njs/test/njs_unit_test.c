@@ -7,6 +7,7 @@
 #include <njs_core.h>
 #include <nxt_lvlhsh.h>
 #include <nxt_djb_hash.h>
+#include <nxt_pcre.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/resource.h>
@@ -4451,6 +4452,12 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("'α'.toUTF8()[0]"),
       nxt_string("\xCE") },
 
+    { nxt_string("var r = /^\\x80$/; r.source + r.source.length"),
+      nxt_string("^\\x80$6") },
+
+    { nxt_string("var r = /^\\\\x80$/; r.source + r.source.length"),
+      nxt_string("^\\\\x80$7") },
+
     { nxt_string("/^\\x80$/.test('\\x80'.toBytes())"),
       nxt_string("true") },
 
@@ -6960,6 +6967,39 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("new RegExp('', 'x')"),
       nxt_string("SyntaxError: Invalid RegExp flags \"x\"") },
 
+    { nxt_string("RegExp({})"),
+      nxt_string("/[object Object]/") },
+
+    { nxt_string("RegExp(true)"),
+      nxt_string("/true/") },
+
+    { nxt_string("RegExp(undefined)"),
+      nxt_string("/(?:)/") },
+
+    { nxt_string("RegExp('abc', undefined)"),
+      nxt_string("/abc/") },
+
+    { nxt_string("RegExp('abc', {})"),
+      nxt_string("SyntaxError: Invalid RegExp flags \"[object Object]\"") },
+
+    { nxt_string("RegExp(/expr/)"),
+      nxt_string("/expr/") },
+
+    { nxt_string("RegExp(/expr/i).ignoreCase"),
+      nxt_string("true") },
+
+    { nxt_string("RegExp(/expr/, 'x')"),
+      nxt_string("SyntaxError: Invalid RegExp flags \"x\"") },
+
+    { nxt_string("RegExp(new RegExp('expr'))"),
+      nxt_string("/expr/") },
+
+    { nxt_string("RegExp(new RegExp('expr')).multiline"),
+      nxt_string("false") },
+
+    { nxt_string("RegExp(new RegExp('expr'), 'm').multiline"),
+      nxt_string("true") },
+
     { nxt_string("new RegExp('[')"),
       nxt_string("SyntaxError: pcre_compile(\"[\") failed: missing terminating ] for character class") },
 
@@ -7778,6 +7818,62 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("Object.prototype.__proto__.f()"),
       nxt_string("TypeError: cannot get property \"f\" of undefined") },
+
+    { nxt_string("var obj = Object.create(null); obj.one = 1;"
+                 "var res = [];"
+                 "for (var val in obj) res.push(val); res"),
+      nxt_string("one") },
+
+    { nxt_string("var o1 = Object.create(null); o1.one = 1;"
+                 "var o2 = Object.create(o1); o2.two = 2;"
+                 "var o3 = Object.create(o2); o3.three = 3;"
+                 "var res = [];"
+                 "for (var val in o3) res.push(val); res"),
+      nxt_string("three,two,one") },
+
+    { nxt_string("var o1 = Object.create(null); o1.one = 1;"
+                 "var o2 = Object.create(o1);"
+                 "var o3 = Object.create(o2); o3.three = 3;"
+                 "var res = [];"
+                 "for (var val in o3) res.push(val); res"),
+      nxt_string("three,one") },
+
+    { nxt_string("var o1 = Object.create(null); o1.one = 1;"
+                 "var o2 = Object.create(o1);"
+                 "var o3 = Object.create(o2);"
+                 "var res = [];"
+                 "for (var val in o3) res.push(val); res"),
+      nxt_string("one") },
+
+    { nxt_string("var o1 = Object.create(null); o1.one = 1;"
+                 "var o2 = Object.create(o1); o2.two = 2;"
+                 "var o3 = Object.create(o2); o3.three = 3;"
+                 "o3.two = -2; o3.one = -1;"
+                 "var res = [];"
+                 "for (var val in o3) res.push(val); res"),
+      nxt_string("three,two,one") },
+
+    { nxt_string("var a = []; for(var p in 'abc') a.push(p); a"),
+      nxt_string("0,1,2") },
+
+    { nxt_string("var a = []; for(var p in Object('abc')) a.push(p); a"),
+      nxt_string("0,1,2") },
+
+    { nxt_string("var o = Object('abc'); var x = Object.create(o);"
+                 "x.a = 1; x.b = 2;"
+                 "var a = []; for(var p in x) a.push(p); a"),
+      nxt_string("a,b,0,1,2") },
+
+#if 0
+    /* TODO: No properties implementation for array type
+     * (enumerable, writable, configurable).
+     */
+
+    { nxt_string("var o = Object("abc"); var x = Object.create(o);"
+                 "x['sd'] = 44; x[1] = 8; x[55] = 8;"
+                 "Object.keys(x)"),
+      nxt_string("55,sd") },
+#endif
 
     { nxt_string("Object.prototype.toString.call(Object.prototype)"),
       nxt_string("[object Object]") },
@@ -11957,6 +12053,28 @@ static njs_unit_test_t  njs_tz_test[] =
 };
 
 
+static njs_unit_test_t  njs_regexp_test[] =
+{
+    { nxt_string("/[\\\\u02E0-\\\\u02E4]/"),
+      nxt_string("/[\\\\u02E0-\\\\u02E4]/") },
+
+    { nxt_string("/[\\u02E0-\\u02E4]/"),
+      nxt_string("/[\\u02E0-\\u02E4]/") },
+
+    { nxt_string("RegExp('[\\\\u02E0-\\\\u02E4]')"),
+      nxt_string("/[\\u02E0-\\u02E4]/") },
+
+    { nxt_string("/[\\u0430-\\u044f]+/.test('тест')"),
+      nxt_string("true") },
+
+    { nxt_string("RegExp('[\\\\u0430-\\\\u044f]+').test('тест')"),
+      nxt_string("true") },
+
+    { nxt_string("RegExp('[\\\\u0430-\\\\u044f]+').exec('тест')[0]"),
+      nxt_string("тест") },
+};
+
+
 typedef struct {
     nxt_lvlhsh_t          hash;
     const njs_extern_t    *proto;
@@ -12715,6 +12833,93 @@ done:
 
 
 static nxt_int_t
+njs_timezone_optional_test(nxt_bool_t disassemble, nxt_bool_t verbose)
+{
+    size_t      size;
+    u_char      buf[16];
+    time_t      clock;
+    struct tm   tm;
+    nxt_int_t   ret;
+
+    /*
+     * Chatham Islands NZ-CHAT time zone.
+     * Standard time: UTC+12:45, Daylight Saving time: UTC+13:45.
+     */
+    (void) putenv((char *) "TZ=Pacific/Chatham");
+    tzset();
+
+    clock = 0;
+    localtime_r(&clock, &tm);
+
+    size = strftime((char *) buf, sizeof(buf), "%z", &tm);
+
+    if (memcmp(buf, "+1245", size) == 0) {
+        ret = njs_unit_test(njs_tz_test, nxt_nitems(njs_tz_test), disassemble,
+                            verbose);
+        if (ret != NXT_OK) {
+            return ret;
+        }
+
+        nxt_printf("njs timezone tests passed\n");
+
+    } else {
+        nxt_printf("njs timezone tests skipped, timezone is unavailable\n");
+    }
+
+    return NXT_OK;
+}
+
+static nxt_int_t
+njs_regexp_optional_test(nxt_bool_t disassemble, nxt_bool_t verbose)
+{
+    int         erroff;
+    pcre        *re1, *re2;
+    njs_ret_t   ret;
+    const char  *errstr;
+
+    /*
+     * pcre-8.21 crashes when it compiles unicode escape codes inside
+     * square brackets when PCRE_UTF8 option is provided.
+     * Catching it in runtime by compiling it without PCRE_UTF8. Normally it
+     * should return NULL and "character value in \u.... sequence is too large"
+     * error string.
+     */
+    re1 = pcre_compile("/[\\u0410]/", PCRE_JAVASCRIPT_COMPAT, &errstr, &erroff,
+                      NULL);
+
+    /*
+     * pcre-7.8 fails to compile unicode escape codes inside square brackets
+     * even when PCRE_UTF8 option is provided.
+     */
+    re2 = pcre_compile("/[\\u0410]/", PCRE_JAVASCRIPT_COMPAT | PCRE_UTF8,
+                       &errstr, &erroff, NULL);
+
+    if (re1 == NULL && re2 != NULL) {
+        ret = njs_unit_test(njs_regexp_test, nxt_nitems(njs_regexp_test),
+                            disassemble, verbose);
+        if (ret != NXT_OK) {
+            return ret;
+        }
+
+        nxt_printf("njs unicode regexp tests passed\n");
+
+    } else {
+        nxt_printf("njs unicode regexp tests skipped, libpcre fails\n");
+    }
+
+    if (re1 != NULL) {
+        pcre_free(re1);
+    }
+
+    if (re2 != NULL) {
+        pcre_free(re2);
+    }
+
+    return NXT_OK;
+}
+
+
+static nxt_int_t
 njs_vm_json_test(nxt_bool_t disassemble, nxt_bool_t verbose)
 {
     njs_vm_t           *vm;
@@ -13025,10 +13230,6 @@ done:
 int nxt_cdecl
 main(int argc, char **argv)
 {
-    size_t      size;
-    u_char      buf[16];
-    time_t      clock;
-    struct tm   tm;
     nxt_int_t   ret;
     nxt_bool_t  disassemble, verbose;
 
@@ -13059,32 +13260,17 @@ main(int argc, char **argv)
         return ret;
     }
 
-    nxt_printf("njs unit tests passed\n");
-
-    /*
-     * Chatham Islands NZ-CHAT time zone.
-     * Standard time: UTC+12:45, Daylight Saving time: UTC+13:45.
-     */
-    (void) putenv((char *) "TZ=Pacific/Chatham");
-    tzset();
-
-    clock = 0;
-    localtime_r(&clock, &tm);
-
-    size = strftime((char *) buf, sizeof(buf), "%z", &tm);
-
-    if (memcmp(buf, "+1245", size) == 0) {
-        ret = njs_unit_test(njs_tz_test, nxt_nitems(njs_tz_test), disassemble,
-                            verbose);
-        if (ret != NXT_OK) {
-            return ret;
-        }
-
-        nxt_printf("njs timezone tests passed\n");
-
-    } else {
-        nxt_printf("njs timezone tests skipped, timezone is unavailable\n");
+    ret = njs_timezone_optional_test(disassemble, verbose);
+    if (ret != NXT_OK) {
+        return ret;
     }
+
+    ret = njs_regexp_optional_test(disassemble, verbose);
+    if (ret != NXT_OK) {
+        return ret;
+    }
+
+    nxt_printf("njs unit tests passed\n");
 
     ret = njs_vm_json_test(disassemble, verbose);
     if (ret != NXT_OK) {
