@@ -4207,6 +4207,69 @@ static njs_unit_test_t  njs_test[] =
                  "a.sort(function(x, y) { return x - y })"),
       nxt_string("1,") },
 
+    /* Template literal. */
+
+    { nxt_string("`"),
+      nxt_string("SyntaxError: Unterminated template literal in 1") },
+
+    { nxt_string("`$"),
+      nxt_string("SyntaxError: Unterminated template literal in 1") },
+
+    { nxt_string("`${"),
+      nxt_string("SyntaxError: Unexpected end of input in 1") },
+
+    { nxt_string("`${a"),
+      nxt_string("SyntaxError: Missing \"}\" in template expression in 1") },
+
+    { nxt_string("`${}"),
+      nxt_string("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { nxt_string("`${a}"),
+      nxt_string("SyntaxError: Unterminated template literal in 1") },
+
+    { nxt_string("`${a}bc"),
+      nxt_string("SyntaxError: Unterminated template literal in 1") },
+
+    { nxt_string("`\\"),
+      nxt_string("SyntaxError: Unterminated template literal in 1") },
+
+    { nxt_string("`\\${a}bc"),
+      nxt_string("SyntaxError: Unterminated template literal in 1") },
+
+    { nxt_string("`text1\ntext2`;"),
+      nxt_string("text1\ntext2") },
+
+    { nxt_string("var o = 1; `o = \\`${o}\\``"),
+      nxt_string("o = `1`") },
+
+    { nxt_string("`\\unicode`"),
+      nxt_string("SyntaxError: Invalid Unicode code point \"\\unicode\" in 1") },
+
+    { nxt_string("var a = 5; var b = 10;"
+                 "`Fifteen is ${a + b} and \nnot ${2 * a + b}.`;"),
+      nxt_string("Fifteen is 15 and \nnot 20.") },
+
+    { nxt_string("var s = `1undefined`; s;"),
+      nxt_string("1undefined") },
+
+    { nxt_string("var s = '0'; s = `x${s += '1'}`;"),
+      nxt_string("x01") },
+
+    { nxt_string("var d = new Date(2011, 5, 24, 18, 45, 12, 625);"
+                 "var something = 'test'; var one = 1; var two = 2;"
+                 "`[${d.toISOString()}] the message contents ${something} ${one + two}`"),
+      nxt_string("[2011-06-24T18:45:12.625Z] the message contents test 3") },
+
+    { nxt_string("function isLargeScreen() { return false; }"
+                 "var item = { isCollapsed: true };"
+                 "`header ${ isLargeScreen() ? '' : `icon-${item.isCollapsed ? 'expander' : 'collapser'}` }`;"),
+      nxt_string("header icon-expander") },
+
+    { nxt_string("function foo(strings, person, age) { return `${strings[0]}${strings[1]}${person}${age}` };"
+                 "var person = 'Mike'; var age = 21;"
+                 "foo`That ${person} is a ${age}`;"),
+      nxt_string("That  is a Mike21") },
+
     /* Strings. */
 
     { nxt_string("var a = '0123456789' + '012345';"
@@ -5724,6 +5787,42 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("\n{\nreturn;\n}"),
       nxt_string("SyntaxError: Illegal return statement in 3") },
+
+    { nxt_string("if (1) function f(){}"),
+      nxt_string("SyntaxError: Functions can only be declared at top level or inside a block in 1") },
+
+    { nxt_string("if (1) { function f(){}}"),
+      nxt_string("undefined") },
+
+    { nxt_string("while (1) function f() { }"),
+      nxt_string("SyntaxError: Functions can only be declared at top level or inside a block in 1") },
+
+    { nxt_string("while (1) { break; function f(){}}"),
+      nxt_string("undefined") },
+
+    { nxt_string("for (;;) function f() { }"),
+      nxt_string("SyntaxError: Functions can only be declared at top level or inside a block in 1") },
+
+    { nxt_string("for (;;) { break; function f(){}}"),
+      nxt_string("undefined") },
+
+    { nxt_string("do function f() { } while (0)"),
+      nxt_string("SyntaxError: Functions can only be declared at top level or inside a block in 1") },
+
+    { nxt_string("function f() { return 1; } { function f() { return 2; } } f()"),
+      nxt_string("1") },
+
+    { nxt_string("function f() { return 1; } { function f() { return 2; } { function f() { return 3; } }} f()"),
+      nxt_string("1") },
+
+    { nxt_string("{ var f; function f() {} }"),
+      nxt_string("SyntaxError: \"f\" has already been declared in 1") },
+
+    { nxt_string("{ function f() {} var f; }"),
+      nxt_string("SyntaxError: \"f\" has already been declared in 1") },
+
+    { nxt_string("{ function f() {} { var f }}"),
+      nxt_string("SyntaxError: \"f\" has already been declared in 1") },
 
     { nxt_string("function f() { return f() } f()"),
       nxt_string("RangeError: Maximum call stack size exceeded") },
@@ -7956,13 +8055,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("var x = Array(2**28)"),
       nxt_string("MemoryError") },
 
-    { nxt_string("var r; try {"
-                 "    var x = Array(2**27), y = Array(2**5).fill(x);"
-                 "    Array.prototype.concat.apply(y[0], y.slice(1));"
-                 "} catch (e) {"
-                 "    r = e.name == 'InternalError' || e.name == 'RangeError'"
-                 "} r"),
-      nxt_string("true") },
+    { nxt_string("var x = Array(2**20), y = Array(2**12).fill(x);"
+                 "Array.prototype.concat.apply(y[0], y.slice(1))"),
+      nxt_string("RangeError: Invalid array length") },
 
     { nxt_string("var a = new Array(3); a"),
       nxt_string(",,") },
@@ -11981,6 +12076,25 @@ static njs_unit_test_t  njs_test[] =
 };
 
 
+static njs_unit_test_t  njs_module_test[] =
+{
+    { nxt_string("function f(){return 2}; var f; f()"),
+      nxt_string("SyntaxError: \"f\" has already been declared in 1") },
+
+    { nxt_string("function f(){return 2}; var f = 1; f()"),
+      nxt_string("SyntaxError: \"f\" has already been declared in 1") },
+
+    { nxt_string("function f(){return 1}; function f(){return 2}; f()"),
+      nxt_string("SyntaxError: \"f\" has already been declared in 1") },
+
+    { nxt_string("var f = 1; function f() {};"),
+      nxt_string("SyntaxError: \"f\" has already been declared in 1") },
+
+    { nxt_string("{ var f = 1; } function f() {};"),
+      nxt_string("SyntaxError: \"f\" has already been declared in 1") },
+};
+
+
 static njs_unit_test_t  njs_tz_test[] =
 {
      { nxt_string("var d = new Date(1); d = d + ''; d.slice(0, 33)"),
@@ -12746,8 +12860,8 @@ njs_externals_init(njs_vm_t *vm)
 
 
 static nxt_int_t
-njs_unit_test(njs_unit_test_t tests[], size_t num, nxt_bool_t disassemble,
-    nxt_bool_t verbose)
+njs_unit_test(njs_unit_test_t tests[], size_t num, nxt_bool_t module,
+    nxt_bool_t disassemble, nxt_bool_t verbose)
 {
     u_char        *start;
     njs_vm_t      *vm, *nvm;
@@ -12765,10 +12879,12 @@ njs_unit_test(njs_unit_test_t tests[], size_t num, nxt_bool_t disassemble,
     for (i = 0; i < num; i++) {
 
         if (verbose) {
-            nxt_printf("\"%V\"\n", &njs_test[i].script);
+            nxt_printf("\"%V\"\n", &tests[i].script);
         }
 
         nxt_memzero(&options, sizeof(njs_vm_opt_t));
+
+        options.module = module;
 
         vm = njs_vm_create(&options);
         if (vm == NULL) {
@@ -12781,9 +12897,9 @@ njs_unit_test(njs_unit_test_t tests[], size_t num, nxt_bool_t disassemble,
             goto done;
         }
 
-        start = njs_test[i].script.start;
+        start = tests[i].script.start;
 
-        ret = njs_vm_compile(vm, &start, start + njs_test[i].script.length);
+        ret = njs_vm_compile(vm, &start, start + tests[i].script.length);
 
         if (ret == NXT_OK) {
             if (disassemble) {
@@ -12810,7 +12926,7 @@ njs_unit_test(njs_unit_test_t tests[], size_t num, nxt_bool_t disassemble,
             }
         }
 
-        success = nxt_strstr_eq(&njs_test[i].ret, &s);
+        success = nxt_strstr_eq(&tests[i].ret, &s);
 
         if (success) {
             if (nvm != NULL) {
@@ -12825,7 +12941,7 @@ njs_unit_test(njs_unit_test_t tests[], size_t num, nxt_bool_t disassemble,
         }
 
         nxt_printf("njs(\"%V\")\nexpected: \"%V\"\n     got: \"%V\"\n",
-                   &njs_test[i].script, &njs_test[i].ret, &s);
+                   &tests[i].script, &tests[i].ret, &s);
 
         goto done;
     }
@@ -12868,8 +12984,8 @@ njs_timezone_optional_test(nxt_bool_t disassemble, nxt_bool_t verbose)
     size = strftime((char *) buf, sizeof(buf), "%z", &tm);
 
     if (memcmp(buf, "+1245", size) == 0) {
-        ret = njs_unit_test(njs_tz_test, nxt_nitems(njs_tz_test), disassemble,
-                            verbose);
+        ret = njs_unit_test(njs_tz_test, nxt_nitems(njs_tz_test), 0,
+                            disassemble, verbose);
         if (ret != NXT_OK) {
             return ret;
         }
@@ -12882,6 +12998,7 @@ njs_timezone_optional_test(nxt_bool_t disassemble, nxt_bool_t verbose)
 
     return NXT_OK;
 }
+
 
 static nxt_int_t
 njs_regexp_optional_test(nxt_bool_t disassemble, nxt_bool_t verbose)
@@ -12909,7 +13026,7 @@ njs_regexp_optional_test(nxt_bool_t disassemble, nxt_bool_t verbose)
                        &errstr, &erroff, NULL);
 
     if (re1 == NULL && re2 != NULL) {
-        ret = njs_unit_test(njs_regexp_test, nxt_nitems(njs_regexp_test),
+        ret = njs_unit_test(njs_regexp_test, nxt_nitems(njs_regexp_test), 0,
                             disassemble, verbose);
         if (ret != NXT_OK) {
             return ret;
@@ -13054,8 +13171,6 @@ done:
 
     return rc;
 }
-
-
 
 
 static nxt_int_t
@@ -13269,7 +13384,18 @@ main(int argc, char **argv)
     (void) putenv((char *) "TZ=UTC");
     tzset();
 
-    ret = njs_unit_test(njs_test, nxt_nitems(njs_test), disassemble, verbose);
+    /* script tests. */
+
+    ret = njs_unit_test(njs_test, nxt_nitems(njs_test), 0, disassemble,
+                        verbose);
+    if (ret != NXT_OK) {
+        return ret;
+    }
+
+    /* module tests. */
+
+    ret = njs_unit_test(njs_module_test, nxt_nitems(njs_module_test), 1,
+                        disassemble, verbose);
     if (ret != NXT_OK) {
         return ret;
     }
