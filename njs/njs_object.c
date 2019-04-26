@@ -107,7 +107,14 @@ njs_object_value_alloc(njs_vm_t *vm, const njs_value_t *value, nxt_uint_t type)
 
     if (nxt_fast_path(ov != NULL)) {
         nxt_lvlhsh_init(&ov->object.hash);
-        nxt_lvlhsh_init(&ov->object.shared_hash);
+
+        if (type == NJS_STRING) {
+            ov->object.shared_hash = vm->shared->string_instance_hash;
+
+        } else {
+            nxt_lvlhsh_init(&ov->object.shared_hash);
+        }
+
         ov->object.type = njs_object_value_type(type);
         ov->object.shared = 0;
         ov->object.extensible = 1;
@@ -276,7 +283,6 @@ njs_object_property(njs_vm_t *vm, const njs_object_t *object,
  *   NXT_ERROR            exception has been thrown.
  *
  *   TODO:
- *     Object.create([1,2]).length
  *     Object.defineProperty([1,2], '1', {configurable:false})
  */
 

@@ -50,6 +50,8 @@ static njs_ret_t njs_vmcode_number_argument(njs_vm_t *vm, njs_value_t *invld1,
     njs_value_t *inlvd2);
 static njs_ret_t njs_vmcode_string_argument(njs_vm_t *vm, njs_value_t *invld1,
     njs_value_t *inlvd2);
+static njs_ret_t njs_vmcode_primitive_argument(njs_vm_t *vm,
+    njs_value_t *invld1, njs_value_t *inlvd2);
 static njs_ret_t njs_primitive_value(njs_vm_t *vm, njs_value_t *value,
     nxt_uint_t hint);
 static njs_ret_t njs_vmcode_restart(njs_vm_t *vm, njs_value_t *invld1,
@@ -172,7 +174,7 @@ start:
 
         if (vmcode->code.retval) {
             retval = njs_vmcode_operand(vm, vmcode->operand1);
-            //njs_release(vm, retval);
+            njs_release(vm, retval);
             *retval = vm->retval;
         }
     }
@@ -199,6 +201,7 @@ start:
 
         case NJS_TRAP_NUMBER_ARG:
         case NJS_TRAP_STRING_ARG:
+        case NJS_TRAP_PRIMITIVE_ARG:
 
             njs_vm_trap_argument(vm, trap);
 
@@ -1997,7 +2000,8 @@ njs_vmcode_method_frame(njs_vm_t *vm, njs_value_t *object, njs_value_t *name)
 
     if (value == NULL || !njs_is_function(value)) {
         njs_string_get(name, &string);
-        njs_type_error(vm, "\"%V\" is not a function", &string);
+        njs_type_error(vm, "(intermediate value)[\"%V\"] is not a function",
+                       &string);
         return NXT_ERROR;
     }
 
@@ -2607,16 +2611,24 @@ static const njs_vmcode_1addr_t  njs_trap_string_argument = {
 };
 
 
+static const njs_vmcode_1addr_t  njs_trap_primitive_argument = {
+    .code = { .operation = njs_vmcode_primitive_argument,
+              .operands =  NJS_VMCODE_NO_OPERAND,
+              .retval = NJS_VMCODE_NO_RETVAL }
+};
+
+
 static const njs_vm_trap_t  njs_vm_traps[] = {
-    /* NJS_TRAP_NUMBER     */  { .code = &njs_trap_number[0]       },
-    /* NJS_TRAP_NUMBERS    */  { .code = &njs_trap_numbers[0]      },
-    /* NJS_TRAP_ADDITION   */  { .code = &njs_trap_addition[0]     },
-    /* NJS_TRAP_COMPARISON */  { .code = &njs_trap_comparison[0]   },
-    /* NJS_TRAP_INCDEC     */  { .code = &njs_trap_numbers[1],
-                                 .reference = 1                    },
-    /* NJS_TRAP_PROPERTY   */  { .code = &njs_trap_property[0]     },
-    /* NJS_TRAP_NUMBER_ARG */  { .code = &njs_trap_number_argument },
-    /* NJS_TRAP_STRING_ARG */  { .code = &njs_trap_string_argument },
+    /* NJS_TRAP_NUMBER     */     { .code = &njs_trap_number[0]       },
+    /* NJS_TRAP_NUMBERS    */     { .code = &njs_trap_numbers[0]      },
+    /* NJS_TRAP_ADDITION   */     { .code = &njs_trap_addition[0]     },
+    /* NJS_TRAP_COMPARISON */     { .code = &njs_trap_comparison[0]   },
+    /* NJS_TRAP_INCDEC     */     { .code = &njs_trap_numbers[1],
+                                    .reference = 1                    },
+    /* NJS_TRAP_PROPERTY   */     { .code = &njs_trap_property[0]     },
+    /* NJS_TRAP_NUMBER_ARG */     { .code = &njs_trap_number_argument },
+    /* NJS_TRAP_STRING_ARG */     { .code = &njs_trap_string_argument },
+    /* NJS_TRAP_PRIMITIVE_ARG */  { .code = &njs_trap_primitive_argument },
 };
 
 
@@ -2830,6 +2842,30 @@ njs_vmcode_string_argument(njs_vm_t *vm, njs_value_t *invld1,
 
 
 static njs_ret_t
+njs_vmcode_primitive_argument(njs_vm_t *vm, njs_value_t *invld1,
+    njs_value_t *inlvd2)
+{
+    njs_ret_t    ret;
+    njs_value_t  *value;
+
+    value = &vm->top_frame->trap_values[0];
+
+    ret = njs_primitive_value(vm, value, 0);
+
+    if (nxt_fast_path(ret > 0)) {
+        *vm->top_frame->trap_values[1].data.u.value = *value;
+
+        vm->current = vm->top_frame->trap_restart;
+        vm->top_frame->trap_restart = NULL;
+
+        return 0;
+    }
+
+    return ret;
+}
+
+
+static njs_ret_t
 njs_vmcode_restart(njs_vm_t *vm, njs_value_t *invld1, njs_value_t *invld2)
 {
     u_char                *restart;
@@ -2852,17 +2888,21 @@ njs_vmcode_restart(njs_vm_t *vm, njs_value_t *invld1, njs_value_t *invld2)
 
     ret = vmcode->code.operation(vm, value1, &frame->trap_values[1]);
 
+    if (nxt_slow_path(ret == NJS_ERROR)) {
+        return ret;
+    }
+
     if (nxt_slow_path(ret == NJS_TRAP)) {
         /* Trap handlers are not reentrant. */
         njs_internal_error(vm, "trap inside restart instruction");
         return NXT_ERROR;
     }
 
-    retval = njs_vmcode_operand(vm, vmcode->operand1);
-
-    //njs_release(vm, retval);
-
-    *retval = vm->retval;
+    if (vmcode->code.retval) {
+        retval = njs_vmcode_operand(vm, vmcode->operand1);
+        njs_release(vm, retval);
+        *retval = vm->retval;
+    }
 
     return ret;
 }

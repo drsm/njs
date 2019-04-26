@@ -1645,6 +1645,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("'-1' < {valueOf: function() {return -2}}"),
       nxt_string("false") },
 
+    { nxt_string("new 0[isNaN]"),
+      nxt_string("TypeError: (intermediate value)[\"[object Function]\"] is not a function") },
+
     /**/
 
     { nxt_string("var a; a = 1 ? 2 : 3"),
@@ -4381,6 +4384,29 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("'abc'.length"),
       nxt_string("3") },
 
+    { nxt_string("'привет\\n'.length"),
+      nxt_string("7") },
+
+    { nxt_string("'привет\\n\\u{61}\\u{3B1}\\u{20AC}'.length"),
+      nxt_string("10") },
+
+    { nxt_string("'\\ud83d\\udc4d'"),
+      nxt_string("\xf0\x9f\x91\x8d") },
+
+    { nxt_string("'\\ud83d\\udc4d'.length"),
+      nxt_string("1") },
+
+    { nxt_string("'\\ud83d abc \\udc4d'"),
+      nxt_string("SyntaxError: Invalid surrogate pair "
+                 "\"\\ud83d abc \\udc4d\" in 1") },
+
+    { nxt_string("'\\ud83d'"),
+      nxt_string("SyntaxError: Invalid surrogate pair \"\\ud83d\" in 1") },
+
+    { nxt_string("'\\ud83d\\uabcd'"),
+      nxt_string("SyntaxError: Invalid surrogate pair "
+                 "\"\\ud83d\\uabcd\" in 1") },
+
     { nxt_string("''.hasOwnProperty('length')"),
       nxt_string("true") },
 
@@ -5352,6 +5378,33 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("('β' + 'α'.repeat(33)+'β').replace(/(α+)(β+)/, function(m, p1) { return p1[32]; })"),
       nxt_string("βα") },
 
+    { nxt_string("'abc'.match(/a*/g)"),
+      nxt_string("a,,,") },
+
+    { nxt_string("'abc'.match(/z*/g)"),
+      nxt_string(",,,") },
+
+    { nxt_string("'abc'.match(/.?/g)"),
+      nxt_string("a,b,c,") },
+
+    { nxt_string("''.match(/a*/g)"),
+      nxt_string("") },
+
+    { nxt_string("''.match(/.?/g)"),
+      nxt_string("") },
+
+    { nxt_string("'абв'.match(/я?/g)"),
+      nxt_string(",,,") },
+
+    { nxt_string("'αβγ'.match(/z*/g)"),
+      nxt_string(",,,") },
+
+    { nxt_string("'囲碁織'.match(/z*/g)"),
+      nxt_string(",,,") },
+
+    { nxt_string("'𝟘𝟙𝟚𝟛'.match(/z*/g)"),
+      nxt_string(",,,,") },
+
     { nxt_string("'abcdefgh'.match()"),
       nxt_string("") },
 
@@ -5940,7 +5993,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("TypeError: number is not a function") },
 
     { nxt_string("var o = {a:1}; o.a()"),
-      nxt_string("TypeError: \"a\" is not a function") },
+      nxt_string("TypeError: (intermediate value)[\"a\"] is not a function") },
 
     { nxt_string("(function(){})()"),
       nxt_string("undefined") },
@@ -7394,10 +7447,10 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("SyntaxError: Unexpected token \"null\" in 1") },
 
     { nxt_string("'a'.f()"),
-      nxt_string("TypeError: \"f\" is not a function") },
+      nxt_string("TypeError: (intermediate value)[\"f\"] is not a function") },
 
     { nxt_string("1..f()"),
-      nxt_string("TypeError: \"f\" is not a function") },
+      nxt_string("TypeError: (intermediate value)[\"f\"] is not a function") },
 
     { nxt_string("try {}"),
       nxt_string("SyntaxError: Missing catch or finally after try in 1") },
@@ -8387,6 +8440,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("new String(123)"),
       nxt_string("123") },
 
+    { nxt_string("Object('123').length"),
+      nxt_string("3") },
+
     { nxt_string("new String(123).length"),
       nxt_string("3") },
 
@@ -9057,6 +9113,18 @@ static njs_unit_test_t  njs_test[] =
                  "1..isPrototypeOf(p)"),
       nxt_string("false") },
 
+    { nxt_string("Object.create(new String('asdf')).length"),
+      nxt_string("4") },
+
+    { nxt_string("Object.create(Object('123')).length"),
+      nxt_string("3") },
+
+    { nxt_string("Object.create([1,2]).length"),
+      nxt_string("2") },
+
+    { nxt_string("Object.create(function(a,b,c){}).length"),
+      nxt_string("3") },
+
     { nxt_string("Object.getOwnPropertyDescriptor({a:1}, 'a').value"),
       nxt_string("1") },
 
@@ -9495,11 +9563,47 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Object.isExtensible(Object.freeze([]))"),
       nxt_string("false") },
 
+    { nxt_string("new Date(undefined)"),
+      nxt_string("Invalid Date") },
+
+    { nxt_string("new Date(Infinity)"),
+      nxt_string("Invalid Date") },
+
+    { nxt_string("new Date(NaN)"),
+      nxt_string("Invalid Date") },
+
+    { nxt_string("new Date(8.65e15)"),
+      nxt_string("Invalid Date") },
+
+    { nxt_string("new Date(0e0.o0)"),
+      nxt_string("Invalid Date") },
+
+    { nxt_string("(new Date(8.639e15)).getTime()"),
+      nxt_string("8639000000000000") },
+
+    { nxt_string("new Date(8.641e15)"),
+      nxt_string("Invalid Date") },
+
+    { nxt_string("(new Date(null)).getTime()"),
+      nxt_string("0") },
+
+    { nxt_string("(new Date(86400)).getTime()"),
+      nxt_string("86400") },
+
     { nxt_string("var d = new Date(''); d +' '+ d.getTime()"),
       nxt_string("Invalid Date NaN") },
 
     { nxt_string("var d = new Date(1); d = d + ''; d.slice(0, 33)"),
       nxt_string("Thu Jan 01 1970 00:00:00 GMT+0000") },
+
+    { nxt_string("var d = new Date({valueOf:()=>86400000}); d = d + ''; d.slice(0, 33)"),
+      nxt_string("Fri Jan 02 1970 00:00:00 GMT+0000") },
+
+    { nxt_string("(new Date({toString:()=>'2011'})).getTime()"),
+      nxt_string("1293840000000") },
+
+    { nxt_string("(new Date({valueOf: ()=>86400, toString:()=>'2011'})).getTime()"),
+      nxt_string("86400") },
 
     { nxt_string("var d = new Date(1308895200000); d.getTime()"),
       nxt_string("1308895200000") },
