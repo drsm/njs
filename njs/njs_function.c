@@ -294,6 +294,7 @@ njs_function_native_frame(njs_vm_t *vm, njs_function_t *function,
     size_t continuation_size, nxt_bool_t ctor)
 {
     size_t              size;
+    u_char              *continuation;
     nxt_uint_t          n;
     njs_value_t         *value, *bound;
     njs_native_frame_t  *frame;
@@ -312,7 +313,13 @@ njs_function_native_frame(njs_vm_t *vm, njs_function_t *function,
     frame->nargs = function->args_offset + nargs;
     frame->ctor = ctor;
 
-    value = (njs_value_t *) (njs_continuation(frame) + continuation_size);
+    continuation = (u_char *) frame + NJS_NATIVE_FRAME_SIZE;
+
+    if (continuation_size > 0) {
+        frame->continuation = (njs_continuation_t *) continuation;
+    }
+
+    value = (njs_value_t *) (continuation + continuation_size);
     frame->arguments = value;
 
     bound = function->bound;
@@ -566,7 +573,7 @@ njs_function_lambda_call(njs_vm_t *vm, njs_index_t retval,
 njs_ret_t
 njs_function_native_call(njs_vm_t *vm, njs_function_native_t native,
     njs_value_t *args, uint8_t *args_types, nxt_uint_t nargs,
-    njs_index_t retval)
+    njs_index_t retval, u_char *return_address)
 {
     njs_ret_t           ret;
     njs_value_t         *value;
@@ -616,6 +623,8 @@ njs_function_native_call(njs_vm_t *vm, njs_function_native_t native,
              */
             *value = vm->retval;
         }
+
+        vm->current = return_address;
 
         njs_function_frame_free(vm, frame);
 
@@ -768,6 +777,10 @@ njs_function_frame_free(njs_vm_t *vm, njs_native_frame_t *frame)
     do {
         previous = frame->previous;
 
+        if (frame->continuation != NULL) {
+            vm->current = frame->continuation->return_address;
+        }
+
         /* GC: free frame->local, etc. */
 
         if (frame->size != 0) {
@@ -907,6 +920,11 @@ njs_function_instance_length(njs_vm_t *vm, njs_value_t *value,
 
         proto = proto->__proto__;
     } while (proto != NULL);
+
+    if (nxt_slow_path(proto == NULL)) {
+        njs_internal_error(vm, "no function in proto chain");
+        return NJS_ERROR;
+    }
 
     function = (njs_function_t *) proto;
 

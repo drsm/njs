@@ -66,10 +66,7 @@ typedef struct {
 
 
 #define njs_vm_continuation(vm)                                               \
-    (void *) njs_continuation((vm)->top_frame)
-
-#define njs_continuation(frame)                                               \
-    ((u_char *) frame + NJS_NATIVE_FRAME_SIZE)
+    (void *) ((vm)->top_frame->continuation)
 
 #define njs_continuation_size(size)                                           \
     nxt_align_size(sizeof(size), sizeof(njs_value_t))
@@ -103,6 +100,8 @@ struct njs_native_frame_s {
 
     njs_function_t                 *function;
     njs_native_frame_t             *previous;
+
+    njs_continuation_t             *continuation;
 
     njs_value_t                    *arguments;
     njs_object_t                   *arguments_object;
@@ -173,7 +172,7 @@ njs_ret_t njs_function_lambda_call(njs_vm_t *vm, njs_index_t retval,
     u_char *return_address);
 njs_ret_t njs_function_native_call(njs_vm_t *vm, njs_function_native_t native,
     njs_value_t *args, uint8_t *args_types, nxt_uint_t nargs,
-    njs_index_t retval);
+    njs_index_t retval, u_char *return_address);
 void njs_function_frame_free(njs_vm_t *vm, njs_native_frame_t *frame);
 
 
