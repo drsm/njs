@@ -322,39 +322,11 @@ njs_property_query(njs_vm_t *vm, njs_property_query_t *pq, njs_value_t *object,
         obj = &vm->string_object;
         break;
 
-    case NJS_OBJECT_STRING:
-        if (nxt_fast_path(!njs_is_null_or_undefined_or_boolean(property))) {
-            index = njs_value_to_index(property);
-
-            if (nxt_fast_path(index < NJS_STRING_MAX_LENGTH)) {
-                ret = njs_string_property_query(vm, pq,
-                                            &object->data.u.object_value->value,
-                                            index);
-
-                if (nxt_fast_path(ret != NXT_DECLINED)) {
-                    return ret;
-                }
-            }
-        }
-
-        obj = object->data.u.object;
-        break;
-
-    case NJS_ARRAY:
-        if (nxt_fast_path(!njs_is_null_or_undefined_or_boolean(property))) {
-            index = njs_value_to_index(property);
-
-            if (nxt_fast_path(index < NJS_ARRAY_MAX_INDEX)) {
-                return njs_array_property_query(vm, pq, object->data.u.array,
-                                                index);
-            }
-        }
-
-        /* Fall through. */
-
     case NJS_OBJECT:
+    case NJS_ARRAY:
     case NJS_OBJECT_BOOLEAN:
     case NJS_OBJECT_NUMBER:
+    case NJS_OBJECT_STRING:
     case NJS_REGEXP:
     case NJS_DATE:
     case NJS_OBJECT_ERROR:
@@ -417,7 +389,7 @@ njs_property_query(njs_vm_t *vm, njs_property_query_t *pq, njs_value_t *object,
 }
 
 
-njs_ret_t
+static njs_ret_t
 njs_object_property_query(njs_vm_t *vm, njs_property_query_t *pq,
     njs_object_t *object, const njs_value_t *property)
 {
@@ -442,63 +414,55 @@ njs_object_property_query(njs_vm_t *vm, njs_property_query_t *pq,
     do {
         pq->prototype = proto;
 
-        /* TODO: length should be Own property */
-
-        if (nxt_fast_path(!pq->own || proto == object)) {
-            ret = nxt_lvlhsh_find(&proto->hash, &pq->lhq);
-
-            if (ret == NXT_OK) {
-                prop = pq->lhq.value;
-
-                if (prop->type != NJS_WHITEOUT) {
-                    pq->shared = 0;
-
-                    return ret;
+        if (!njs_is_null_or_undefined_or_boolean(property)) {
+            switch (proto->type) {
+            case NJS_ARRAY:
+                index = njs_value_to_index(property);
+                if (nxt_fast_path(index < NJS_ARRAY_MAX_INDEX)) {
+                    array = (njs_array_t *) proto;
+                    return njs_array_property_query(vm, pq, array, index);
                 }
 
-                goto next;
-            }
+                break;
 
-            if (proto != object
-                && !njs_is_null_or_undefined_or_boolean(property))
-            {
-                switch (proto->type) {
-                case NJS_ARRAY:
-                    index = njs_value_to_index(property);
-                    if (nxt_fast_path(index < NJS_ARRAY_MAX_INDEX)) {
-                        array = (njs_array_t *) proto;
-                        return njs_array_property_query(vm, pq, array, index);
+            case NJS_OBJECT_STRING:
+                index = njs_value_to_index(property);
+                if (nxt_fast_path(index < NJS_STRING_MAX_LENGTH)) {
+                    ov = (njs_object_value_t *) proto;
+                    ret = njs_string_property_query(vm, pq, &ov->value, index);
+
+                    if (nxt_fast_path(ret != NXT_DECLINED)) {
+                        return ret;
                     }
-
-                    break;
-
-                case NJS_OBJECT_STRING:
-                    index = njs_value_to_index(property);
-                    if (nxt_fast_path(index < NJS_STRING_MAX_LENGTH)) {
-                        ov = (njs_object_value_t *) proto;
-                        return njs_string_property_query(vm, pq, &ov->value,
-                                                         index);
-                    }
-
-                default:
-                    break;
                 }
+
+            default:
+                break;
             }
         }
 
-        ret = nxt_lvlhsh_find(&proto->shared_hash, &pq->lhq);
+        ret = nxt_lvlhsh_find(&proto->hash, &pq->lhq);
 
         if (ret == NXT_OK) {
-            pq->shared = 1;
+            prop = pq->lhq.value;
 
-            return ret;
+            if (prop->type != NJS_WHITEOUT) {
+                return ret;
+            }
+
+        } else {
+            ret = nxt_lvlhsh_find(&proto->shared_hash, &pq->lhq);
+
+            if (ret == NXT_OK) {
+                pq->shared = 1;
+
+                return ret;
+            }
         }
 
-        if (pq->query > NJS_PROPERTY_QUERY_GET) {
+        if (pq->own || pq->query > NJS_PROPERTY_QUERY_GET) {
             return NXT_DECLINED;
         }
-
-next:
 
         proto = proto->__proto__;
 
@@ -775,7 +739,8 @@ njs_method_private_copy(njs_vm_t *vm, njs_property_query_t *pq)
     njs_function_t     *function;
     njs_object_prop_t  *prop, *shared;
 
-    prop = nxt_mp_alloc(vm->mem_pool, sizeof(njs_object_prop_t));
+    prop = nxt_mp_align(vm->mem_pool, sizeof(njs_value_t),
+                        sizeof(njs_object_prop_t));
     if (nxt_slow_path(prop == NULL)) {
         njs_memory_error(vm);
         return NXT_ERROR;
@@ -2619,11 +2584,11 @@ njs_value_t *
 njs_property_prototype_create(njs_vm_t *vm, nxt_lvlhsh_t *hash,
     njs_object_t *prototype)
 {
-    nxt_int_t                  ret;
-    njs_object_prop_t          *prop;
-    nxt_lvlhsh_query_t         lhq;
+    nxt_int_t                 ret;
+    njs_object_prop_t         *prop;
+    nxt_lvlhsh_query_t        lhq;
 
-    static const njs_value_t   proto_string = njs_string("prototype");
+    static const njs_value_t  proto_string = njs_string("prototype");
 
     prop = njs_object_prop_alloc(vm, &proto_string, &njs_value_undefined, 0);
     if (nxt_slow_path(prop == NULL)) {
@@ -2662,6 +2627,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .type = NJS_PROPERTY,
         .name = njs_string("name"),
         .value = njs_string("Object"),
+        .configurable = 1,
     },
 
     /* Object.length == 1. */
@@ -2669,6 +2635,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .type = NJS_PROPERTY,
         .name = njs_string("length"),
         .value = njs_value(NJS_NUMBER, 1, 1.0),
+        .configurable = 1,
     },
 
     /* Object.prototype. */
@@ -2683,6 +2650,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .type = NJS_METHOD,
         .name = njs_string("create"),
         .value = njs_native_function(njs_object_create, 0, 0),
+        .configurable = 1,
     },
 
     /* Object.keys(). */
@@ -2691,6 +2659,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_string("keys"),
         .value = njs_native_function(njs_object_keys, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* ES8: Object.values(). */
@@ -2699,6 +2668,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_string("values"),
         .value = njs_native_function(njs_object_values, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* ES8: Object.entries(). */
@@ -2707,6 +2677,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_string("entries"),
         .value = njs_native_function(njs_object_entries, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.defineProperty(). */
@@ -2716,6 +2687,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .value = njs_native_function(njs_object_define_property, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG,
                                      NJS_STRING_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.defineProperties(). */
@@ -2725,6 +2697,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .value = njs_native_function(njs_object_define_properties, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG,
                                      NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.getOwnPropertyDescriptor(). */
@@ -2734,6 +2707,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .value = njs_native_function(njs_object_get_own_property_descriptor, 0,
                                      NJS_SKIP_ARG, NJS_SKIP_ARG,
                                      NJS_STRING_ARG),
+        .configurable = 1,
     },
 
     /* Object.getOwnPropertyDescriptors(). */
@@ -2742,6 +2716,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_long_string("getOwnPropertyDescriptors"),
         .value = njs_native_function(njs_object_get_own_property_descriptors, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.getOwnPropertyNames(). */
@@ -2750,6 +2725,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_long_string("getOwnPropertyNames"),
         .value = njs_native_function(njs_object_get_own_property_names, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.getPrototypeOf(). */
@@ -2758,6 +2734,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_string("getPrototypeOf"),
         .value = njs_native_function(njs_object_get_prototype_of, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.freeze(). */
@@ -2766,6 +2743,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_string("freeze"),
         .value = njs_native_function(njs_object_freeze, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.isFrozen(). */
@@ -2774,6 +2752,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_string("isFrozen"),
         .value = njs_native_function(njs_object_is_frozen, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.seal(). */
@@ -2782,6 +2761,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_string("seal"),
         .value = njs_native_function(njs_object_seal, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.isSealed(). */
@@ -2790,6 +2770,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_string("isSealed"),
         .value = njs_native_function(njs_object_is_sealed, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.preventExtensions(). */
@@ -2798,6 +2779,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_long_string("preventExtensions"),
         .value = njs_native_function(njs_object_prevent_extensions, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 
     /* Object.isExtensible(). */
@@ -2806,6 +2788,7 @@ static const njs_object_prop_t  njs_object_constructor_properties[] =
         .name = njs_string("isExtensible"),
         .value = njs_native_function(njs_object_is_extensible, 0,
                                      NJS_SKIP_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 };
 
@@ -2902,7 +2885,7 @@ njs_object_prototype_proto(njs_vm_t *vm, njs_value_t *value,
  * "constructor" getter.  The properties are set to appropriate function.
  */
 
-static njs_ret_t
+njs_ret_t
 njs_object_prototype_create_constructor(njs_vm_t *vm, njs_value_t *value,
     njs_value_t *setval, njs_value_t *retval)
 {
@@ -3206,24 +3189,28 @@ static const njs_object_prop_t  njs_object_prototype_properties[] =
         .name = njs_string("__proto__"),
         .value = njs_prop_handler(njs_object_prototype_proto),
         .writable = 1,
+        .configurable = 1,
     },
 
     {
         .type = NJS_PROPERTY_HANDLER,
         .name = njs_string("constructor"),
         .value = njs_prop_handler(njs_object_prototype_create_constructor),
+        .configurable = 1,
     },
 
     {
         .type = NJS_METHOD,
         .name = njs_string("valueOf"),
         .value = njs_native_function(njs_object_prototype_value_of, 0, 0),
+        .configurable = 1,
     },
 
     {
         .type = NJS_METHOD,
         .name = njs_string("toString"),
         .value = njs_native_function(njs_object_prototype_to_string, 0, 0),
+        .configurable = 1,
     },
 
     {
@@ -3231,6 +3218,7 @@ static const njs_object_prop_t  njs_object_prototype_properties[] =
         .name = njs_string("hasOwnProperty"),
         .value = njs_native_function(njs_object_prototype_has_own_property, 0,
                                      NJS_OBJECT_ARG, NJS_STRING_ARG),
+        .configurable = 1,
     },
 
     {
@@ -3238,6 +3226,7 @@ static const njs_object_prop_t  njs_object_prototype_properties[] =
         .name = njs_long_string("propertyIsEnumerable"),
         .value = njs_native_function(njs_object_prototype_prop_is_enumerable, 0,
                                      NJS_OBJECT_ARG, NJS_STRING_ARG),
+        .configurable = 1,
     },
 
     {
@@ -3245,6 +3234,7 @@ static const njs_object_prop_t  njs_object_prototype_properties[] =
         .name = njs_string("isPrototypeOf"),
         .value = njs_native_function(njs_object_prototype_is_prototype_of, 0,
                                      NJS_OBJECT_ARG, NJS_OBJECT_ARG),
+        .configurable = 1,
     },
 };
 

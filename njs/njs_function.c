@@ -31,7 +31,6 @@ njs_function_alloc(njs_vm_t *vm, njs_function_lambda_t *lambda,
         goto fail;
     }
 
-
     /*
      * nxt_mp_zalloc() does also:
      *   nxt_lvlhsh_init(&function->object.hash);
@@ -42,11 +41,11 @@ njs_function_alloc(njs_vm_t *vm, njs_function_lambda_t *lambda,
     function->args_offset = 1;
     function->u.lambda = lambda;
 
-    if (lambda->arrow || !function->ctor) {
-        function->object.shared_hash = vm->shared->arrow_instance_hash;
+    if (function->ctor) {
+        function->object.shared_hash = vm->shared->function_instance_hash;
 
     } else {
-        function->object.shared_hash = vm->shared->function_instance_hash;
+        function->object.shared_hash = vm->shared->arrow_instance_hash;
     }
 
     function->object.__proto__ = &vm->prototypes[NJS_PROTOTYPE_FUNCTION].object;
@@ -873,6 +872,7 @@ static const njs_object_prop_t  njs_function_constructor_properties[] =
         .type = NJS_PROPERTY,
         .name = njs_string("name"),
         .value = njs_string("Function"),
+        .configurable = 1,
     },
 
     /* Function.length == 1. */
@@ -880,6 +880,7 @@ static const njs_object_prop_t  njs_function_constructor_properties[] =
         .type = NJS_PROPERTY,
         .name = njs_string("length"),
         .value = njs_value(NJS_NUMBER, 1, 1.0),
+        .configurable = 1,
     },
 
     /* Function.prototype. */
@@ -1176,26 +1177,44 @@ static const njs_object_prop_t  njs_function_prototype_properties[] =
 {
     {
         .type = NJS_PROPERTY,
+        .name = njs_string("name"),
+        .value = njs_string(""),
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY,
         .name = njs_string("length"),
         .value = njs_value(NJS_NUMBER, 0, 0.0),
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY_HANDLER,
+        .name = njs_string("constructor"),
+        .value = njs_prop_handler(njs_object_prototype_create_constructor),
+        .configurable = 1,
     },
 
     {
         .type = NJS_METHOD,
         .name = njs_string("call"),
         .value = njs_native_function(njs_function_prototype_call, 0, 0),
+        .configurable = 1,
     },
 
     {
         .type = NJS_METHOD,
         .name = njs_string("apply"),
         .value = njs_native_function(njs_function_prototype_apply, 0, 0),
+        .configurable = 1,
     },
 
     {
         .type = NJS_METHOD,
         .name = njs_string("bind"),
         .value = njs_native_function(njs_function_prototype_bind, 0, 0),
+        .configurable = 1,
     },
 };
 
@@ -1213,6 +1232,7 @@ const njs_object_prop_t  njs_function_instance_properties[] =
         .type = NJS_PROPERTY_HANDLER,
         .name = njs_string("length"),
         .value = njs_prop_handler(njs_function_instance_length),
+        .configurable = 1,
     },
 
     {
@@ -1236,6 +1256,7 @@ const njs_object_prop_t  njs_arrow_instance_properties[] =
         .type = NJS_PROPERTY_HANDLER,
         .name = njs_string("length"),
         .value = njs_prop_handler(njs_function_instance_length),
+        .configurable = 1,
     },
 };
 
@@ -1264,6 +1285,7 @@ static const njs_object_prop_t  njs_eval_function_properties[] =
         .type = NJS_PROPERTY,
         .name = njs_string("name"),
         .value = njs_string("eval"),
+        .configurable = 1,
     },
 
     /* eval.length == 1. */
@@ -1271,6 +1293,7 @@ static const njs_object_prop_t  njs_eval_function_properties[] =
         .type = NJS_PROPERTY,
         .name = njs_string("length"),
         .value = njs_value(NJS_NUMBER, 1, 1.0),
+        .configurable = 1,
     },
 };
 

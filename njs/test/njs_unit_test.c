@@ -2265,6 +2265,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("for (null in undefined);"),
       nxt_string("ReferenceError: Invalid left-hand side \"null\" in for-in statement in 1") },
 
+    { nxt_string("for (var a, b in []);"),
+      nxt_string("SyntaxError: Unexpected token \"in\" in 1") },
+
     { nxt_string("var s = ''; for (var p in [1,2]) {s += p}; s"),
       nxt_string("01") },
 
@@ -3125,6 +3128,15 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("delete 1"),
       nxt_string("true") },
 
+    { nxt_string("var a = []; delete a[1]"),
+      nxt_string("true") },
+
+    { nxt_string("var o = {}; [delete o.m, delete o.m]"),
+      nxt_string("true,true") },
+
+    { nxt_string("[delete Array.nonexistent, delete Array.Array]"),
+      nxt_string("true,true") },
+
     { nxt_string("var a; delete (a = 1); a"),
       nxt_string("1") },
 
@@ -3152,6 +3164,19 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("var o = Object.create({a:1}); o.a = 2; delete o.a; o.a"),
       nxt_string("1") },
 
+    { nxt_string("delete Array.name"),
+      nxt_string("true") },
+
+    { nxt_string("delete Math.max"),
+      nxt_string("true") },
+
+    { nxt_string("delete Math.max.length"),
+      nxt_string("true") },
+
+    { nxt_string("function f(a,b) {} "
+                 "[f.length, delete f.length, f.length, delete f.length]"),
+      nxt_string("2,true,0,true") },
+
     { nxt_string("njs.dump({break:1,3:2,'a':4,\"b\":2,true:1,null:0})"),
       nxt_string("{break:1,3:2,a:4,b:2,true:1,null:0}") },
 
@@ -3174,10 +3199,10 @@ static njs_unit_test_t  njs_test[] =
                  "var c = new Cl('a', 'b'); Cl.prototype.z = 1; c.z"),
       nxt_string("1") },
 
-    /* Math object is immutable. */
+    /**/
 
-    { nxt_string("delete Math.max"),
-      nxt_string("TypeError: Cannot delete property \"max\" of object") },
+    { nxt_string("delete Math.E"),
+      nxt_string("TypeError: Cannot delete property \"E\" of object") },
 
     { nxt_string("Math.E = 1"),
       nxt_string("TypeError: Cannot assign to read-only property \"E\" of object") },
@@ -3258,7 +3283,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("1,2,34") },
 
     { nxt_string("delete[]['4e9']"),
-      nxt_string("false") },
+      nxt_string("true") },
 
     { nxt_string("var n = 1, a = [ n += 1 ]; a"),
       nxt_string("2") },
@@ -6737,7 +6762,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("SyntaxError: Identifier \"arguments\" is forbidden in var declaration in 1") },
 
     { nxt_string("for (var arguments in []) {}"),
-      nxt_string("SyntaxError: Identifier \"arguments\" is forbidden in for-in var declaration in 1") },
+      nxt_string("SyntaxError: Identifier \"arguments\" is forbidden in var declaration in 1") },
 
     { nxt_string("function arguments(){}"),
       nxt_string("SyntaxError: Identifier \"arguments\" is forbidden in function declaration in 1") },
@@ -7115,6 +7140,18 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("Quick Brown Fox Jumps Brown Jumps undefined "
                  "4 25 The Quick Brown Fox Jumps Over The Lazy Dog") },
 
+    { nxt_string("var r = /a/.exec('a'); ['groups' in r, typeof r.groups]"),
+      nxt_string("true,undefined") },
+
+    { nxt_string("var r = /(?<m>[0-9]{2})\\/(?<d>[0-9]{2})\\/(?<y>[0-9]{4})/;"
+                 "var g = r.exec('12/31/1986').groups;"
+                 "g.d + '.' + g.m + '.' + g.y"),
+      nxt_string("31.12.1986") },
+
+    { nxt_string("var g = /(?<r>(?<no>no)?(?<yes>yes)?)/.exec('yes').groups;"
+                 "[Object.keys(g).length,'no' in g, typeof g.no, g.yes, g.r]"),
+      nxt_string("3,true,undefined,yes,yes") },
+
     { nxt_string("var s; var r = /./g; while (s = r.exec('abc')); s"),
       nxt_string("null") },
 
@@ -7241,6 +7278,9 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("") },
 
     { nxt_string("Error.prototype.constructor == Error"),
+      nxt_string("true") },
+
+    { nxt_string("Error.prototype.hasOwnProperty('constructor')"),
       nxt_string("true") },
 
     { nxt_string("Error().__proto__ == Error.prototype"),
@@ -7384,6 +7424,24 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("URIError.prototype.constructor == URIError"),
+      nxt_string("true") },
+
+    { nxt_string("EvalError.prototype.hasOwnProperty('constructor')"),
+      nxt_string("true") },
+
+    { nxt_string("RangeError.prototype.hasOwnProperty('constructor')"),
+      nxt_string("true") },
+
+    { nxt_string("ReferenceError.prototype.hasOwnProperty('constructor')"),
+      nxt_string("true") },
+
+    { nxt_string("SyntaxError.prototype.hasOwnProperty('constructor')"),
+      nxt_string("true") },
+
+    { nxt_string("TypeError.prototype.hasOwnProperty('constructor')"),
+      nxt_string("true") },
+
+    { nxt_string("URIError.prototype.hasOwnProperty('constructor')"),
       nxt_string("true") },
 
     { nxt_string("EvalError().__proto__ == EvalError.prototype"),
@@ -7991,6 +8049,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Object.prototype.constructor === Object"),
       nxt_string("true") },
 
+    { nxt_string("Object.prototype.hasOwnProperty('constructor')"),
+      nxt_string("true") },
+
     { nxt_string("Object.prototype.__proto__ === null"),
       nxt_string("true") },
 
@@ -8159,6 +8220,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Array.prototype.constructor === Array"),
       nxt_string("true") },
 
+    { nxt_string("Array.prototype.hasOwnProperty('constructor')"),
+      nxt_string("true") },
+
     { nxt_string("Array.prototype.__proto__ === Object.prototype"),
       nxt_string("true") },
 
@@ -8235,6 +8299,9 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("Boolean.prototype.constructor === Boolean"),
+      nxt_string("true") },
+
+    { nxt_string("Boolean.prototype.hasOwnProperty('constructor')"),
       nxt_string("true") },
 
     { nxt_string("Boolean.prototype.__proto__ === Object.prototype"),
@@ -8345,6 +8412,9 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("Number.prototype.constructor === Number"),
+      nxt_string("true") },
+
+    { nxt_string("Number.prototype.hasOwnProperty('constructor')"),
       nxt_string("true") },
 
     { nxt_string("Number.prototype.__proto__ === Object.prototype"),
@@ -8561,6 +8631,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("String.prototype.constructor === String"),
       nxt_string("true") },
 
+    { nxt_string("String.prototype.hasOwnProperty('constructor')"),
+      nxt_string("true") },
+
     { nxt_string("String.prototype.__proto__ === Object.prototype"),
       nxt_string("true") },
 
@@ -8595,6 +8668,9 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("Function.prototype.constructor === Function"),
+      nxt_string("true") },
+
+    { nxt_string("Function.prototype.hasOwnProperty('constructor')"),
       nxt_string("true") },
 
     { nxt_string("Function.prototype.__proto__ === Object.prototype"),
@@ -8637,6 +8713,9 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("RegExp.prototype.constructor === RegExp"),
+      nxt_string("true") },
+
+    { nxt_string("RegExp.prototype.hasOwnProperty('constructor')"),
       nxt_string("true") },
 
     { nxt_string("RegExp.prototype.__proto__ === Object.prototype"),
@@ -9099,6 +9178,12 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("'s'.hasOwnProperty('1')"),
       nxt_string("false") },
 
+    { nxt_string("Object.hasOwnProperty('hasOwnProperty')"),
+      nxt_string("false") },
+
+    { nxt_string("Object.prototype.hasOwnProperty('hasOwnProperty')"),
+      nxt_string("true") },
+
     { nxt_string("var p = { a:5 }; var o = Object.create(p);"
                  "Object.getPrototypeOf(o) === p"),
       nxt_string("true") },
@@ -9156,6 +9241,17 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("Object.create(function(a,b,c){}).length"),
       nxt_string("3") },
+
+    { nxt_string("Object.create(Math).hasOwnProperty('abs')"),
+      nxt_string("false") },
+
+    { nxt_string("var m = Object.create(Math); m.abs = 3;"
+                 "[m.hasOwnProperty('abs'), m.abs]"),
+      nxt_string("true,3") },
+
+    { nxt_string("var m = Object.create(Math); m.abs = Math.floor;"
+                 "[m.hasOwnProperty('abs'), delete m.abs, m.abs(-1)]"),
+      nxt_string("true,true,1") },
 
     { nxt_string("Object.getOwnPropertyDescriptor({a:1}, 'a').value"),
       nxt_string("1") },
@@ -9307,10 +9403,8 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Object.getOwnPropertyNames(Array)"),
       nxt_string("name,length,prototype,isArray,of") },
 
-#if 0
     { nxt_string("Object.getOwnPropertyNames(Array.isArray)"),
       nxt_string("length") },
-#endif
 
     { nxt_string("Object.defineProperty(Object.freeze({}), 'b', {})"),
       nxt_string("TypeError: object is not extensible") },
@@ -9594,6 +9688,35 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("Object.isExtensible(Object.freeze([]))"),
       nxt_string("false") },
+
+    { nxt_string(
+        "var fail;"
+        "function isConfigurableMethods(o) {"
+        "    var except = ["
+        "        'prototype',"
+        "    ];"
+        "    return Object.getOwnPropertyNames(o)"
+        "                 .filter(v => !except.includes(v)"
+        "                              && typeof o[v] == 'function')"
+        "                 .every(v => Object.getOwnPropertyDescriptor(o, v)"
+        "                                   .configurable"
+        "                             || !(fail = `${o.name}.${v}`));"
+        "}"
+        "["
+        "    Boolean, Boolean.prototype,"
+        "    Number, Number.prototype,"
+        "    String, String.prototype,"
+        "    Object, Object.prototype,"
+        "    Array, Array.prototype,"
+        "    Function, Function.prototype,"
+        "    RegExp, RegExp.prototype,"
+        "    Date, Date.prototype,"
+        "    Error, Error.prototype,"
+        "    Math,"
+        "    JSON,"
+        "].every(obj => isConfigurableMethods(obj)) || fail"),
+
+      nxt_string("true") },
 
     { nxt_string("new Date(undefined)"),
       nxt_string("Invalid Date") },
@@ -10017,6 +10140,9 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("true") },
 
     { nxt_string("Date.prototype.constructor === Date"),
+      nxt_string("true") },
+
+    { nxt_string("Date.prototype.hasOwnProperty('constructor')"),
       nxt_string("true") },
 
     { nxt_string("Date.prototype.__proto__ === Object.prototype"),
@@ -13101,11 +13227,11 @@ done:
 static nxt_int_t
 njs_timezone_optional_test(nxt_bool_t disassemble, nxt_bool_t verbose)
 {
-    size_t      size;
-    u_char      buf[16];
-    time_t      clock;
-    struct tm   tm;
-    nxt_int_t   ret;
+    size_t     size;
+    u_char     buf[16];
+    time_t     clock;
+    struct tm  tm;
+    nxt_int_t  ret;
 
     /*
      * Chatham Islands NZ-CHAT time zone.

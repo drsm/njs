@@ -30,15 +30,17 @@
 
 
 typedef struct {
+    uint8_t                 disassemble;
+    uint8_t                 interactive;
+    uint8_t                 module;
+    uint8_t                 quiet;
+    uint8_t                 sandbox;
+    uint8_t                 version;
+
     char                    *file;
+    char                    *command;
     size_t                  n_paths;
     char                    **paths;
-    nxt_int_t               version;
-    nxt_int_t               disassemble;
-    nxt_int_t               interactive;
-    nxt_int_t               sandbox;
-    nxt_int_t               quiet;
-    nxt_int_t               module;
 } njs_opts_t;
 
 
@@ -210,8 +212,10 @@ int
 main(int argc, char **argv)
 {
     char          path[MAXPATHLEN], *p;
+    njs_vm_t      *vm;
     nxt_int_t     ret;
     njs_opts_t    opts;
+    nxt_str_t     command;
     njs_vm_opt_t  vm_options;
 
     nxt_memzero(&opts, sizeof(njs_opts_t));
@@ -239,7 +243,13 @@ main(int argc, char **argv)
             goto done;
         }
 
-        memcpy(path + nxt_strlen(path), "/shell", sizeof("/shell"));
+        if (opts.command == NULL) {
+            memcpy(path + nxt_strlen(path), "/shell", sizeof("/shell"));
+
+        } else {
+            memcpy(path + nxt_strlen(path), "/string", sizeof("/string"));
+        }
+
         opts.file = path;
     }
 
@@ -258,6 +268,14 @@ main(int argc, char **argv)
 
     if (opts.interactive) {
         ret = njs_interactive_shell(&opts, &vm_options);
+
+    } else if (opts.command) {
+        vm = njs_create_vm(&opts, &vm_options);
+        if (vm != NULL) {
+            command.start = (u_char *) opts.command;
+            command.length = nxt_strlen(opts.command);
+            ret = njs_process_script(vm_options.external, &opts, &command);
+        }
 
     } else {
         ret = njs_process_file(&opts, &vm_options);
@@ -283,11 +301,12 @@ njs_get_options(njs_opts_t *opts, int argc, char** argv)
         "Interactive njs shell.\n"
         "\n"
         "Options:\n"
+        "  -c                specify the command to execute.\n"
         "  -d                print disassembled code.\n"
+        "  -p                set path prefix for modules.\n"
         "  -q                disable interactive introduction prompt.\n"
         "  -s                sandbox mode.\n"
         "  -t script|module  source code type (script is default).\n"
-        "  -p                set path prefix for modules.\n"
         "  -v                print njs version and exit.\n"
         "  <filename> | -    run code from a file or stdin.\n";
 
@@ -311,9 +330,37 @@ njs_get_options(njs_opts_t *opts, int argc, char** argv)
             (void) write(STDIN_FILENO, help, nxt_length(help));
             return ret;
 
+        case 'c':
+            opts->interactive = 0;
+
+            if (++i < argc) {
+                opts->command = argv[i];
+                break;
+            }
+
+            nxt_error("option \"-c\" requires argument\n");
+            return NXT_ERROR;
+
         case 'd':
             opts->disassemble = 1;
             break;
+
+        case 'p':
+            if (++i < argc) {
+                opts->n_paths++;
+                paths = realloc(opts->paths, opts->n_paths * sizeof(char *));
+                if (paths == NULL) {
+                    nxt_error("failed to add path\n");
+                    return NXT_ERROR;
+                }
+
+                opts->paths = paths;
+                opts->paths[opts->n_paths - 1] = argv[i];
+                break;
+            }
+
+            nxt_error("option \"-p\" requires directory name\n");
+            return NXT_ERROR;
 
         case 'q':
             opts->quiet = 1;
@@ -339,24 +386,6 @@ njs_get_options(njs_opts_t *opts, int argc, char** argv)
 
             nxt_error("option \"-t\" requires source type\n");
             return NXT_ERROR;
-
-        case 'p':
-            if (++i < argc) {
-                opts->n_paths++;
-                paths = realloc(opts->paths, opts->n_paths * sizeof(char *));
-                if (paths == NULL) {
-                    nxt_error("failed to add path\n");
-                    return NXT_ERROR;
-                }
-
-                opts->paths = paths;
-                opts->paths[opts->n_paths - 1] = argv[i];
-                break;
-            }
-
-            nxt_error("option \"-p\" requires directory name\n");
-            return NXT_ERROR;
-
         case 'v':
         case 'V':
             opts->version = 1;

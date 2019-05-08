@@ -1057,14 +1057,12 @@ njs_parser_var_statement(njs_vm_t *vm, njs_parser_t *parser, njs_token_t parent,
         if (token != NJS_TOKEN_NAME) {
             if (token == NJS_TOKEN_ARGUMENTS || token == NJS_TOKEN_EVAL) {
                 njs_parser_syntax_error(vm, parser, "Identifier \"%V\" "
-                                        "is forbidden in %s declaration",
-                                        njs_parser_text(parser),
-                                        var_in ? "for-in var" : "var");
+                                        "is forbidden in var declaration",
+                                        njs_parser_text(parser));
             }
 
             return NJS_TOKEN_ILLEGAL;
         }
-
 
         name = njs_parser_variable_node(vm, parser,
                                         njs_parser_text(parser),
@@ -1079,8 +1077,12 @@ njs_parser_var_statement(njs_vm_t *vm, njs_parser_t *parser, njs_token_t parent,
             return token;
         }
 
-        if (var_in && token == NJS_TOKEN_IN) {
-            return njs_parser_var_in_statement(vm, parser, name);
+        if (var_in) {
+            if (token == NJS_TOKEN_IN) {
+                return njs_parser_var_in_statement(vm, parser, name);
+            }
+
+            var_in = 0;
         }
 
         expr = NULL;
@@ -2176,9 +2178,9 @@ njs_token_t
 njs_parser_arrow_expression(njs_vm_t *vm, njs_parser_t *parser,
     njs_token_t token)
 {
-    njs_ret_t               ret;
-    njs_index_t             index;
-    njs_parser_node_t       *node, *body, *parent;
+    njs_ret_t              ret;
+    njs_index_t            index;
+    njs_parser_node_t      *node, *body, *parent;
     njs_function_lambda_t  *lambda;
 
     node = njs_parser_node_new(vm, parser, NJS_TOKEN_FUNCTION_EXPRESSION);
