@@ -212,16 +212,20 @@ njs_array_string_add(njs_vm_t *vm, njs_array_t *array, const u_char *start,
 
 njs_ret_t
 njs_array_expand(njs_vm_t *vm, njs_array_t *array, uint32_t prepend,
-    uint32_t new_size)
+    uint32_t append)
 {
+    uint32_t     free_before, free_after;
     uint64_t     size;
     njs_value_t  *start, *old;
 
-    size = (uint64_t) new_size + array->length;
+    free_before = array->start - array->data;
+    free_after = array->size - array->length - free_before;
 
-    if (nxt_fast_path(size <= array->size && prepend == 0)) {
+    if (nxt_fast_path(free_before >= prepend && free_after >= append)) {
         return NXT_OK;
     }
+
+    size = (uint64_t) prepend + array->length + append;
 
     if (size < 16) {
         size *= 2;
@@ -230,12 +234,12 @@ njs_array_expand(njs_vm_t *vm, njs_array_t *array, uint32_t prepend,
         size += size / 2;
     }
 
-    if (nxt_slow_path(((prepend + size) * sizeof(njs_value_t)) >= UINT32_MAX)) {
+    if (nxt_slow_path(size > NJS_ARRAY_MAX_LENGTH)) {
         goto memory_error;
     }
 
     start = nxt_mp_align(vm->mem_pool, sizeof(njs_value_t),
-                         (prepend + size) * sizeof(njs_value_t));
+                         size * sizeof(njs_value_t));
     if (nxt_slow_path(start == NULL)) {
         goto memory_error;
     }
@@ -728,11 +732,9 @@ njs_array_prototype_unshift(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         n = nargs - 1;
 
         if (n != 0) {
-            if ((intptr_t) n > (array->start - array->data)) {
-                ret = njs_array_expand(vm, array, n, 0);
-                if (nxt_slow_path(ret != NXT_OK)) {
-                    return ret;
-                }
+            ret = njs_array_expand(vm, array, n, 0);
+            if (nxt_slow_path(ret != NXT_OK)) {
+                return ret;
             }
 
             array->length += n;
