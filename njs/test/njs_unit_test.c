@@ -5127,6 +5127,18 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("'abc abc абвгд abc'.lastIndexOf('абвгд')"),
       nxt_string("8") },
 
+    { nxt_string("'abc abc абвгд abc'.lastIndexOf('абвгд', undefined)"),
+      nxt_string("8") },
+
+    { nxt_string("'abc abc абвгд abc'.lastIndexOf('абвгд', NaN)"),
+      nxt_string("8") },
+
+    { nxt_string("'abc abc абвгд abc'.lastIndexOf('абвгд', {})"),
+      nxt_string("8") },
+
+    { nxt_string("String.prototype.lastIndexOf.call({toString:()=>'abc abc абвгд abc'}, 'абвгд')"),
+      nxt_string("8") },
+
     { nxt_string("'abc abc абвгдежз'.lastIndexOf('абвгд')"),
       nxt_string("8") },
 
@@ -5153,6 +5165,22 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("''.lastIndexOf('')"),
       nxt_string("0") },
+
+    { nxt_string("''.lastIndexOf()"),
+      nxt_string("-1") },
+
+    { nxt_string("''.lastIndexOf(undefined)"),
+      nxt_string("-1") },
+
+    { nxt_string("'β'.repeat(32).lastIndexOf('β')"),
+      nxt_string("31") },
+
+    { nxt_string("'β'.repeat(32).lastIndexOf``"),
+      nxt_string("32") },
+
+    { nxt_string("JSON.stringify(Array(24).fill(true).map((v,i) => 'abc abc ab abc абвгдежзab'.lastIndexOf('abc', i)))"
+                 "== JSON.stringify([].concat(Array(4).fill(0), Array(7).fill(4), Array(13).fill(11)))"),
+      nxt_string("true") },
 
     { nxt_string("''.includes('')"),
       nxt_string("true") },
@@ -5335,6 +5363,9 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("'abcdefgh'.replace('d', undefined)"),
       nxt_string("abcundefinedefgh") },
+
+    { nxt_string("'a'.repeat(16).replace('a'.repeat(17)) === 'a'.repeat(16)"),
+      nxt_string("true") },
 
     { nxt_string("'abcdefgh'.replace('d', null)"),
       nxt_string("abcnullefgh") },
