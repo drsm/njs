@@ -181,11 +181,16 @@ njs_string_new(njs_vm_t *vm, njs_value_t *value, const u_char *start,
 
 
 nxt_noinline u_char *
-njs_string_alloc(njs_vm_t *vm, njs_value_t *value, uint32_t size,
-    uint32_t length)
+njs_string_alloc(njs_vm_t *vm, njs_value_t *value, uint64_t size,
+    uint64_t length)
 {
     uint32_t      total, map_offset, *map;
     njs_string_t  *string;
+
+    if (nxt_slow_path(size > NJS_STRING_MAX_LENGTH)) {
+        njs_range_error(vm, "invalid string length");
+        return NULL;
+    }
 
     value->type = NJS_STRING;
     njs_string_truth(value, size);
@@ -844,7 +849,7 @@ njs_string_prototype_concat(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     njs_index_t unused)
 {
     u_char             *p, *start;
-    size_t             size, length, mask;
+    uint64_t           size, length, mask;
     nxt_uint_t         i;
     njs_string_prop_t  string;
 
@@ -2757,7 +2762,7 @@ njs_string_match_multiple(njs_vm_t *vm, njs_value_t *args,
 
 
 /*
- * String.split([string|regexp[, limit]])
+ * String.prototype.split([string|regexp[, limit]])
  */
 
 static njs_ret_t
@@ -2838,7 +2843,8 @@ found:
 
                 /* Empty split string. */
                 if (p == next) {
-                    p = nxt_utf8_next(p, end);
+                    p = (utf8 != NJS_STRING_BYTE) ? nxt_utf8_next(p, end)
+                                                  : p + 1;
                     next = p;
                 }
 
@@ -2885,7 +2891,8 @@ found:
 
                 /* Empty split regexp. */
                 if (p == next) {
-                    p = nxt_utf8_next(p, end);
+                    p = (utf8 != NJS_STRING_BYTE) ? nxt_utf8_next(p, end)
+                                                  : p + 1;
                     next = p;
                 }
 
@@ -3061,11 +3068,16 @@ njs_string_replace_regexp(njs_vm_t *vm, njs_value_t *args,
     njs_string_replace_t *r)
 {
     int                        *captures;
+    u_char                     *p, *start;
     njs_ret_t                  ret;
+    const u_char               *end;
     njs_regexp_pattern_t       *pattern;
-    njs_string_replace_part_t  *part;
+    njs_string_replace_part_t  replace;
 
     pattern = args[1].data.u.regexp->pattern;
+    end = r->part[0].start + r->part[0].size;
+
+    replace = r->part[1];
 
     do {
         ret = njs_regexp_match(vm, &pattern->regex[r->type],
@@ -3102,24 +3114,49 @@ njs_string_replace_regexp(njs_vm_t *vm, njs_value_t *args,
                     r->part -= 2;
                 }
 
-                r->part[2].start = r->part[0].start + captures[1];
-                r->part[2].size = r->part[0].size - captures[1];
-                njs_set_invalid(&r->part[2].value);
+                if (captures[1] == 0) {
 
-                if (r->function != NULL) {
-                    return njs_string_replace_regexp_function(vm, args, r,
-                                                              captures, ret);
+                    /* Empty match. */
+
+                    start = r->part[0].start;
+
+                    if (start < end) {
+                        p = (u_char *) nxt_utf8_next(start, end);
+
+                        r->part[1].start = start;
+                        r->part[1].size = p - start;
+
+                        r->part[2].start = p;
+                        r->part[2].size = end - p;
+
+                    } else {
+                        r->part[1].size = 0;
+                        r->part[2].size = 0;
+
+                        /* To exit the loop. */
+                        r->part[2].start = start + 1;
+                    }
+
+                    r->part[0] = replace;
+
+                } else {
+                    r->part[2].start = r->part[0].start + captures[1];
+                    r->part[2].size = r->part[0].size - captures[1];
+                    njs_set_invalid(&r->part[2].value);
+
+                    if (r->function != NULL) {
+                        return njs_string_replace_regexp_function(vm, args, r,
+                                                                 captures, ret);
+                    }
+
+                    r->part[0].size = captures[0];
+
+                    r->part[1] = replace;
                 }
-
-                r->part[0].size = captures[0];
 
                 if (!pattern->global) {
                     return njs_string_replace_regexp_join(vm, r);
                 }
-
-                /* A literal replacement is stored in the second part. */
-                part = r->parts.start;
-                r->part[1] = part[1];
 
                 r->part += 2;
             }
@@ -3131,7 +3168,7 @@ njs_string_replace_regexp(njs_vm_t *vm, njs_value_t *args,
             return NXT_ERROR;
         }
 
-    } while (r->part[0].size > 0);
+    } while (r->part[0].start <= end);
 
     if (r->part != r->parts.start) {
         return njs_string_replace_regexp_join(vm, r);
@@ -3325,20 +3362,28 @@ static njs_ret_t
 njs_string_replace_search_continuation(njs_vm_t *vm, njs_value_t *args,
     nxt_uint_t nargs, njs_index_t unused)
 {
+    njs_ret_t             ret;
+    njs_value_t           string;
     njs_string_replace_t  *r;
 
     r = njs_vm_continuation(vm);
 
-    if (njs_is_string(&r->retval)) {
-        njs_string_replacement_copy(&r->part[1], &r->retval);
-
-        return njs_string_replace_join(vm, r);
+    if (!njs_is_primitive(&r->retval)) {
+        njs_vm_trap_value(vm, &r->retval);
+        return njs_trap(vm, NJS_TRAP_STRING_ARG);
     }
 
-    njs_internal_error(vm, "unexpected continuation retval type:%s",
+    ret = njs_primitive_value_to_string(vm, &string, &r->retval);
+    if (nxt_slow_path(ret != NJS_OK)) {
+        njs_type_error(vm, "cannot convert primitive value to string: %s",
                        njs_type_string(r->retval.type));
 
-    return NXT_ERROR;
+        return NXT_ERROR;
+    }
+
+    njs_string_replacement_copy(&r->part[1], &string);
+
+    return njs_string_replace_join(vm, r);
 }
 
 
@@ -3447,11 +3492,15 @@ static njs_ret_t
 njs_string_replace_substitute(njs_vm_t *vm, njs_string_replace_t *r,
     int *captures)
 {
-    uint32_t                   i, n, last;
+    uint32_t                   i, n, last, index;
+    const u_char               *end;
     njs_string_subst_t         *s;
     njs_string_replace_part_t  *part, *subject;
 
+    index = 0;
+
     last = r->substitutions->items;
+    end = r->part[0].start + r->part[0].size;
 
     part = nxt_array_add_multiple(&r->parts, &njs_array_mem_proto, vm->mem_pool,
                                   last + 1);
@@ -3462,6 +3511,22 @@ njs_string_replace_substitute(njs_vm_t *vm, njs_string_replace_t *r,
     r->part = &part[-1];
 
     part[last].start = r->part[0].start + captures[1];
+
+    if (captures[1] == 0) {
+
+        /* Empty match. */
+
+        if (r->part[0].start < end) {
+            captures[1] = nxt_utf8_next(r->part[0].start, end)
+                          - r->part[0].start;
+            part[last].start = r->part[0].start + captures[1];
+
+        } else {
+            /* To exit the loop. */
+            part[last].start = r->part[0].start + 1;
+        }
+    }
+
     part[last].size = r->part[0].size - captures[1];
     njs_set_invalid(&part[last].value);
 
@@ -3498,9 +3563,61 @@ njs_string_replace_substitute(njs_vm_t *vm, njs_string_replace_t *r,
          * "$&" is the same as "$0", the "$0" however is not supported.
          */
         default:
+            if (captures[n] == captures[n + 1]) {
+
+                /* Empty match. */
+
+                if (captures[n - 1] == captures[n]) {
+
+                    /*
+                     * Consecutive empty matches as in
+                     * 'ab'.replace(/(z*)(h*)/g, 'x')
+                     */
+
+                    part->size = 0;
+                    break;
+                }
+
+                index = n;
+                continue;
+            }
+
+            if (index != 0) {
+
+                /*
+                 * Inserting a single character after a series of
+                 * (possibly several) empty matches.
+                 */
+
+                if (part->start < end) {
+                    part->start = r->part[0].start + captures[index];
+                    part->size = nxt_utf8_next(part->start, end) - part->start;
+
+                } else {
+                    part->size = 0;
+                }
+
+                index = 0;
+                break;
+            }
+
             part->start = r->part[0].start + captures[n];
             part->size = captures[n + 1] - captures[n];
             break;
+        }
+
+        njs_set_invalid(&part->value);
+        part++;
+    }
+
+    if (index != 0) {
+        part->start = r->part[0].start + captures[index];
+
+        if (part->start < end) {
+            part->size = nxt_utf8_next(part->start, end) - part->start;
+
+        } else {
+            part->size = 0;
         }
 
         njs_set_invalid(&part->value);

@@ -3399,10 +3399,8 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("\n[\n1\n,\n2]\n[\n0]"),
       nxt_string("1") },
 
-#if 0
     { nxt_string("Object.create([1,2]).length"),
       nxt_string("2") },
-#endif
 
     { nxt_string("Object.create(['α','β'])[1]"),
       nxt_string("β") },
@@ -3656,6 +3654,9 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("Array.prototype.slice.call('αβZγ')"),
       nxt_string("α,β,Z,γ") },
+
+    { nxt_string("Array.prototype.slice.call(String.bytesFrom(Array(16).fill(0x9d)))[0].charCodeAt(0)"),
+      nxt_string("157") },
 
     { nxt_string("Array.prototype.slice.call('αβZγ', 1)"),
       nxt_string("β,Z,γ") },
@@ -4617,6 +4618,11 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("'A'.repeat(16).toBytes() === 'A'.repeat(16)"),
       nxt_string("true") },
 
+    { nxt_string("var s = 'x'.repeat(2**10).repeat(2**14);"
+                 "var a = Array(200).fill(s);"
+                 "String.prototype.concat.apply(s, a.slice(1))"),
+      nxt_string("RangeError: invalid string length") },
+
     { nxt_string("var a = 'abcdefgh'; a.substr(3, 15)"),
       nxt_string("defgh") },
 
@@ -5451,6 +5457,78 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("('β' + 'α'.repeat(33)+'β').replace(/(α+)(β+)/, function(m, p1) { return p1[32]; })"),
       nxt_string("βα") },
 
+    { nxt_string("'abc'.replace(/(h*)(z*)(g*)/g, '$1nn$2zz$3')"),
+      nxt_string("nnzzannzzbnnzzcnnzz") },
+
+    { nxt_string("'abc'.replace(/(h*)(z*)/g, '$1nn$2zz$3yy')"),
+      nxt_string("nnzz$3yyannzz$3yybnnzz$3yycnnzz$3yy") },
+
+    { nxt_string("'ъ'.replace(/(h*)/g, '$1ЮЙ')"),
+      nxt_string("ЮЙъЮЙ") },
+
+    { nxt_string("'ъg'.replace(/(h*)/g, '$1ЮЙ')"),
+      nxt_string("ЮЙъЮЙgЮЙ") },
+
+    { nxt_string("'ъg'.replace(/(ъ*)/g, '$1ЮЙ')"),
+      nxt_string("ъЮЙЮЙgЮЙ") },
+
+    { nxt_string("'ъg'.replace(/(h*)/g, 'fg$1ЮЙ')"),
+      nxt_string("fgЮЙъfgЮЙgfgЮЙ") },
+
+    { nxt_string("'юgёfя'.replace(/(gё)/g, 'n$1i')"),
+      nxt_string("юngёifя") },
+
+    { nxt_string("'aabbccaa'.replace(/a*/g, '')"),
+      nxt_string("bbcc") },
+
+    { nxt_string("'aabbccaab'.replace(/z*/g, '')"),
+      nxt_string("aabbccaab") },
+
+    { nxt_string("'αβγ'.replace(/z*/g, '|')"),
+      nxt_string("|α|β|γ|") },
+
+    { nxt_string("''.replace(/a*/g, '')"),
+      nxt_string("") },
+
+    { nxt_string("'12345'.replace(3, () => 0)"),
+      nxt_string("12045") },
+
+    { nxt_string("'123'.replace(3, function() { return {toString: ()=>({})}; })"),
+      nxt_string("TypeError: Cannot convert object to primitive value") },
+
+    { nxt_string("'12345'.replace(3, () => ({toString: () => 'aaaa'}))"),
+      nxt_string("12aaaa45") },
+
+    { nxt_string("/]/"),
+      nxt_string("/\\]/") },
+
+    { nxt_string("/\\]/"),
+      nxt_string("/\\]/") },
+
+    { nxt_string("/ab]cd/"),
+      nxt_string("/ab\\]cd/") },
+
+    { nxt_string("/ab]/"),
+      nxt_string("/ab\\]/") },
+
+    { nxt_string("/]cd/"),
+      nxt_string("/\\]cd/") },
+
+    { nxt_string("']'.match(/]/)"),
+      nxt_string("]") },
+
+    { nxt_string("'ab]cd'.match(/]/)"),
+      nxt_string("]") },
+
+    { nxt_string("'ab]'.match(/]/)"),
+      nxt_string("]") },
+
+    { nxt_string("']cd'.match(/]/)"),
+      nxt_string("]") },
+
+    { nxt_string("'ab]cd'.match(/\\]/)"),
+      nxt_string("]") },
+
     { nxt_string("'abc'.match(/a*/g)"),
       nxt_string("a,,,") },
 
@@ -5940,6 +6018,9 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("function f() { return 1; } { function f() { return 2; } { function f() { return 3; } }} f()"),
       nxt_string("1") },
+
+    { nxt_string("{function f() {} {} f() }"),
+      nxt_string("undefined") },
 
     { nxt_string("{ var f; function f() {} }"),
       nxt_string("SyntaxError: \"f\" has already been declared in 1") },
@@ -7072,6 +7153,37 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("/a\\q/"),
       nxt_string("/a\\q/") },
+
+    { nxt_string("/\\\\/"),
+      nxt_string("/\\\\/") },
+
+    { nxt_string("/\\\\\\/"),
+      nxt_string("SyntaxError: Unterminated RegExp \"/\\\\\\/\" in 1") },
+
+    { nxt_string("/\\\\\\\\/"),
+      nxt_string("/\\\\\\\\/") },
+
+    { nxt_string("/\\\\\\//"),
+      nxt_string("/\\\\\\//") },
+
+    { nxt_string("/[A-Z/]/"),
+      nxt_string("/[A-Z/]/") },
+
+    { nxt_string("/[A-Z\n]/"),
+      nxt_string("SyntaxError: Unterminated RegExp \"/[A-Z\" in 1") },
+
+    { nxt_string("/[A-Z\\\n]/"),
+      nxt_string("SyntaxError: Unterminated RegExp \"/[A-Z\\\" in 1") },
+
+    { nxt_string("/\\\n/"),
+      nxt_string("SyntaxError: Unterminated RegExp \"/\\\" in 1") },
+
+    { nxt_string("/^[A-Za-z0-9+/]{4}$/.test('////')"),
+      nxt_string("true") },
+
+    { nxt_string("'[]!\"#$%&\\'()*+,.\\/:;<=>?@\\^_`{|}-'.split('')"
+                 ".every(ch=>/[\\]\\[!\"#$%&'()*+,.\\/:;<=>?@\\^_`{|}-]/.test(ch))"),
+      nxt_string("true") },
 
     { nxt_string("/a\\q/.test('a\\q')"),
       nxt_string("true") },
@@ -9130,6 +9242,9 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var o = Object.defineProperties({a:1}, {}); o.a"),
       nxt_string("1") },
+
+    { nxt_string("Object.defineProperties()"),
+      nxt_string("TypeError: cannot convert undefined argument to object") },
 
     { nxt_string("Object.defineProperties(1, {})"),
       nxt_string("TypeError: cannot convert number argument to object") },

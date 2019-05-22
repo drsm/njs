@@ -206,26 +206,110 @@ njs_regexp_create(njs_vm_t *vm, njs_value_t *value, u_char *start,
 }
 
 
+nxt_inline njs_ret_t
+njs_regexp_escape_bracket(njs_vm_t *vm, nxt_str_t *text, size_t count)
+{
+    size_t  length, diff;
+    u_char  *p, *dst, *start, *end;
+
+    length = text->length + count;
+
+    dst = nxt_mp_alloc(vm->mem_pool, length);
+    if (nxt_slow_path(dst == NULL)) {
+        njs_memory_error(vm);
+        return NJS_ERROR;
+    }
+
+    start = text->start;
+    end = text->start + text->length;
+
+    for (p = start; p < end; p++) {
+
+        switch (*p) {
+        case '[':
+            while (++p < end && *p != ']') {
+                if (*p == '\\') {
+                    p++;
+                }
+            }
+
+            break;
+
+        case ']':
+            diff = p - start;
+            dst = nxt_cpymem(dst, start, diff);
+            dst = nxt_cpymem(dst, "\\]", 2);
+
+            start = p + 1;
+            break;
+
+        case '\\':
+            p++;
+            break;
+        }
+    }
+
+    diff = p - start;
+    memcpy(dst, start, diff);
+
+    text->start = dst - (length - diff);
+    text->length = length;
+
+    return NJS_OK;
+}
+
+
 njs_token_t
 njs_regexp_literal(njs_vm_t *vm, njs_parser_t *parser, njs_value_t *value)
 {
-    u_char                *p, c;
+    u_char                *p;
+    size_t                closing_brackets;
     nxt_str_t             text;
+    njs_ret_t             ret;
     njs_lexer_t           *lexer;
     njs_regexp_flags_t    flags;
     njs_regexp_pattern_t  *pattern;
 
+    closing_brackets = 0;
     lexer = parser->lexer;
 
     for (p = lexer->start; p < lexer->end; p++) {
 
-        c = *p;
+        switch (*p) {
+        case '\n':
+        case '\r':
+            goto failed;
 
-        if (c == '\n' || c == '\r') {
+        case '[':
+            while (++p < lexer->end && *p != ']') {
+                switch (*p) {
+                case '\n':
+                case '\r':
+                    goto failed;
+
+                case '\\':
+                    if (++p < lexer->end && (*p == '\n' || *p == '\r')) {
+                        goto failed;
+                    }
+
+                    break;
+                }
+            }
+
             break;
-        }
 
-        if (c == '/' && !(p > lexer->start && p[-1] == '\\')) {
+        case ']':
+            closing_brackets++;
+            break;
+
+        case '\\':
+            if (++p < lexer->end && (*p == '\n' || *p == '\r')) {
+                goto failed;
+            }
+
+            break;
+
+        case '/':
             text.start = lexer->start;
             text.length = p - text.start;
             p++;
@@ -243,8 +327,28 @@ njs_regexp_literal(njs_vm_t *vm, njs_parser_t *parser, njs_value_t *value)
 
             lexer->start = p;
 
+            if (closing_brackets != 0) {
+                /*
+                 * PCRE with PCRE_JAVASCRIPT_COMPAT flag rejects regexps with
+                 * lone closing square brackets as invalid.  Whereas according
+                 * to ES6: 11.8.5 it is a valid regexp expression.
+                 *
+                 * Escaping it here as a workaround.
+                 */
+
+                ret = njs_regexp_escape_bracket(vm, &text, closing_brackets);
+                if (nxt_slow_path(ret != NXT_OK)) {
+                    return NJS_TOKEN_ILLEGAL;
+                }
+            }
+
             pattern = njs_regexp_pattern_create(vm, text.start, text.length,
                                                 flags);
+
+            if (closing_brackets != 0) {
+                nxt_mp_free(vm->mem_pool, text.start);
+            }
+
             if (nxt_slow_path(pattern == NULL)) {
                 return NJS_TOKEN_ILLEGAL;
             }
@@ -254,6 +358,8 @@ njs_regexp_literal(njs_vm_t *vm, njs_parser_t *parser, njs_value_t *value)
             return NJS_TOKEN_REGEXP;
         }
     }
+
+failed:
 
     njs_parser_syntax_error(vm, parser, "Unterminated RegExp \"%*s\"",
                             p - (lexer->start - 1), lexer->start - 1);
