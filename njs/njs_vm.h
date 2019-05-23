@@ -147,6 +147,11 @@ typedef struct njs_generator_s        njs_generator_t;
  * njs_prop_handler_t operates as a property getter and/or setter.
  * The handler receives NULL setval if it is invoked in GET context and
  * non-null otherwise.
+ *
+ * njs_prop_handler_t is expected to return:
+ *   NXT_OK - handler executed successfully;
+ *   NXT_ERROR - some error, vm->retval contains appropriate exception;
+ *   NXT_DECLINED - handler was applied to inappropriate object.
  */
 typedef njs_ret_t (*njs_prop_handler_t) (njs_vm_t *vm, njs_value_t *value,
     njs_value_t *setval, njs_value_t *retval);
@@ -849,6 +854,13 @@ typedef struct {
 } njs_vmcode_finally_t;
 
 
+typedef struct {
+    njs_vmcode_t               code;
+    nxt_str_t                  name;
+    uint32_t                   token_line;
+} njs_vmcode_reference_error_t;
+
+
 typedef enum {
     NJS_SCOPE_ABSOLUTE = 0,
     NJS_SCOPE_GLOBAL = 1,
@@ -1187,6 +1199,8 @@ njs_ret_t njs_vmcode_object_copy(njs_vm_t *vm, njs_value_t *value,
 
 njs_ret_t njs_vmcode_property_get(njs_vm_t *vm, njs_value_t *object,
     njs_value_t *property);
+njs_ret_t njs_vmcode_property_init(njs_vm_t *vm, njs_value_t *object,
+    njs_value_t *property);
 njs_ret_t njs_vmcode_property_set(njs_vm_t *vm, njs_value_t *object,
     njs_value_t *property);
 njs_ret_t njs_vmcode_property_in(njs_vm_t *vm, njs_value_t *property,
@@ -1303,6 +1317,8 @@ njs_ret_t njs_vmcode_catch(njs_vm_t *vm, njs_value_t *invld,
     njs_value_t *exception);
 njs_ret_t njs_vmcode_finally(njs_vm_t *vm, njs_value_t *invld,
     njs_value_t *retval);
+njs_ret_t njs_vmcode_reference_error(njs_vm_t *vm, njs_value_t *invld1,
+    njs_value_t *invld2);
 
 nxt_bool_t njs_values_strict_equal(const njs_value_t *val1,
     const njs_value_t *val2);

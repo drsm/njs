@@ -3408,6 +3408,10 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Object.create(['α','β'])[false]"),
       nxt_string("undefined") },
 
+    { nxt_string("var a = ['abc']; var o = Object.create(a); o[0] = 32;"
+                 "[a,o[0]]"),
+      nxt_string("abc,32") },
+
     /* Array.length setter */
 
     { nxt_string("[].length = {}"),
@@ -3495,11 +3499,9 @@ static njs_unit_test_t  njs_test[] =
 
     /* Array.toString(). */
 
-# if 0
     { nxt_string("var a = [1,2,3]; a.join = 'NO';"
                  "Object.prototype.toString = function () { return 'A' }; a"),
       nxt_string("[object Array]") },
-#endif
 
     { nxt_string("Array.prototype.toString.call(1)"),
       nxt_string("[object Number]") },
@@ -6294,7 +6296,31 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("a") },
 
     { nxt_string("function f() { var a = f2(); }"),
+      nxt_string("undefined") },
+
+    { nxt_string("function f() { var a = f2(); } f();"),
       nxt_string("ReferenceError: \"f2\" is not defined in 1") },
+
+    { nxt_string("typeof Buffer !== 'undefined' ? Buffer : function Buffer(){}"),
+      nxt_string("[object Function]") },
+
+    { nxt_string("1 == 2 ? func() : '123'"),
+      nxt_string("123") },
+
+    { nxt_string("1 == 1 ? func() : '123'"),
+      nxt_string("ReferenceError: \"func\" is not defined in 1") },
+
+    { nxt_string("function f(){ if (1 == 1) { 1 == 2 ? some_var : '123' } }; f()"),
+      nxt_string("undefined") },
+
+    { nxt_string("function f(){ if (1 == 1) { 1 == 1 ? some_var : '123' } }; f()"),
+      nxt_string("ReferenceError: \"some_var\" is not defined in 1") },
+
+    { nxt_string("function f(){ if (1 == 1) { 1 == 2 ? some_func() : '123' } }; f()"),
+      nxt_string("undefined") },
+
+    { nxt_string("function f(){ if (1 == 1) { 1 == 1 ? some_func() : '123' } }; f()"),
+      nxt_string("ReferenceError: \"some_func\" is not defined in 1") },
 
     { nxt_string("(function(){ function f() {return f}; return f()})()"),
       nxt_string("[object Function]") },
@@ -7103,6 +7129,9 @@ static njs_unit_test_t  njs_test[] =
 
      { nxt_string("var f = (a,b) => 0; f.length"),
        nxt_string("2") },
+
+    { nxt_string("var o = Object.create(f => 1); o.length = 3"),
+      nxt_string("TypeError: Cannot assign to read-only property \"length\" of object") },
 
     /* Scopes. */
 
@@ -8255,16 +8284,8 @@ static njs_unit_test_t  njs_test[] =
                  "var a = []; for(var p in x) a.push(p); a"),
       nxt_string("a,b,0,1,2") },
 
-#if 0
-    /* TODO: No properties implementation for array type
-     * (enumerable, writable, configurable).
-     */
-
-    { nxt_string("var o = Object("abc"); var x = Object.create(o);"
-                 "x['sd'] = 44; x[1] = 8; x[55] = 8;"
-                 "Object.keys(x)"),
-      nxt_string("55,sd") },
-#endif
+    { nxt_string("var o = Object.create(Math); o.abs = -5; Math.abs(o.abs)"),
+      nxt_string("5") },
 
     { nxt_string("Object.prototype.toString.call(Object.prototype)"),
       nxt_string("[object Object]") },
@@ -8381,6 +8402,18 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("Array.prototype.length"),
       nxt_string("0") },
 
+    { nxt_string("Array.prototype.length = 3, Array.prototype"),
+      nxt_string(",,") },
+
+    { nxt_string("var o = Object.create(Array.prototype); o.length = 3;"
+                 "[Array.prototype, Array.prototype.length, o.length]"),
+      nxt_string(",0,3") },
+
+    { nxt_string("var o = Object.create(Array.prototype);"
+                 "Object.defineProperty(o, 'length', {value: 3});"
+                 "[Array.prototype, Array.prototype.length, o.length]"),
+      nxt_string(",0,3") },
+
     { nxt_string("Array.constructor === Function"),
       nxt_string("true") },
 
@@ -8446,6 +8479,15 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("Boolean.prototype.constructor === Boolean"),
       nxt_string("true") },
+
+    { nxt_string("Boolean.prototype.constructor = 1;"
+                 "Boolean.prototype.constructor"),
+      nxt_string("1") },
+
+    { nxt_string("var c = Boolean.prototype.constructor;"
+                 "Boolean.prototype.constructor = 1;"
+                 "[c(0), Boolean.prototype.constructor]"),
+      nxt_string("false,1") },
 
     { nxt_string("Boolean.prototype.hasOwnProperty('constructor')"),
       nxt_string("true") },
@@ -8727,6 +8769,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("var s = new String('αβ'); s[1] = 'b'"),
       nxt_string("TypeError: Cannot assign to read-only property \"1\" of object string") },
 
+    { nxt_string("var o = Object.create(new String('αβ')); o[1] = 'a'"),
+      nxt_string("TypeError: Cannot assign to read-only property \"1\" of object") },
+
     { nxt_string("var s = new String('αβ'); s[4] = 'ab'; s[4]"),
       nxt_string("ab") },
 
@@ -8803,6 +8848,9 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("'test'.constructor.prototype === String.prototype"),
       nxt_string("true") },
+
+    { nxt_string("var o = Object.create(String.prototype); o.length = 1"),
+      nxt_string("TypeError: Cannot assign to read-only property \"length\" of object") },
 
     { nxt_string("Function.name"),
       nxt_string("Function") },
@@ -9102,6 +9150,30 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("var o = {}; Object.defineProperty(o, 'a', {writable:true});"
                  "o.a = 1; o.a"),
       nxt_string("1") },
+
+    { nxt_string("Object.defineProperty(Object.prototype, 'a', {writable:false});"
+                 "var o = {a: 1}; [o.a++, o.a]"),
+      nxt_string("1,2") },
+
+    { nxt_string("var o = {};"
+                 "Object.defineProperty(Object.prototype, 'a', {writable:false});"
+                 "o.a = 1"),
+      nxt_string("TypeError: Cannot assign to read-only property \"a\" of object") },
+
+    { nxt_string("var o = {};"
+                 "Object.defineProperty(Object.prototype, 'a', {writable:true});"
+                 "o.a = 1; o.a"),
+      nxt_string("1") },
+
+    { nxt_string("var p = Object.create(Function);"
+                 "Object.defineProperty(p, 'length', {writable: true});"
+                 "p.length = 32; p.length"),
+      nxt_string("32") },
+
+    { nxt_string("var p = Object.create(Math.abs);"
+                 "Object.defineProperty(p, 'length', {writable: true});"
+                 "p.length = 23; p.length"),
+      nxt_string("23") },
 
     { nxt_string("var o = {};"
                  "Object.defineProperty(o, 'a', {value:1}); delete o.a"),
@@ -9553,7 +9625,7 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("name,length,prototype,isArray,of") },
 
     { nxt_string("Object.getOwnPropertyNames(Array.isArray)"),
-      nxt_string("length") },
+      nxt_string("name,length") },
 
     { nxt_string("Object.defineProperty(Object.freeze({}), 'b', {})"),
       nxt_string("TypeError: object is not extensible") },
@@ -9864,6 +9936,35 @@ static njs_unit_test_t  njs_test[] =
         "    Math,"
         "    JSON,"
         "].every(obj => isConfigurableMethods(obj)) || fail"),
+
+      nxt_string("true") },
+
+    { nxt_string(
+        "var fail;"
+        "function isWritableMethods(o) {"
+        "    var except = ["
+        "        'prototype',"
+        "    ];"
+        "    return Object.getOwnPropertyNames(o)"
+        "                 .filter(v => !except.includes(v)"
+        "                              && typeof o[v] == 'function')"
+        "                 .every(v => Object.getOwnPropertyDescriptor(o, v)"
+        "                                   .writable"
+        "                             || !(fail = `${o.name}.${v}`));"
+        "}"
+        "["
+        "    Boolean, Boolean.prototype,"
+        "    Number, Number.prototype,"
+        "    String, String.prototype,"
+        "    Object, Object.prototype,"
+        "    Array, Array.prototype,"
+        "    Function, Function.prototype,"
+        "    RegExp, RegExp.prototype,"
+        "    Date, Date.prototype,"
+        "    Error, Error.prototype,"
+        "    Math,"
+        "    JSON,"
+        "].every(obj => isWritableMethods(obj)) || fail"),
 
       nxt_string("true") },
 
@@ -12071,6 +12172,37 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("njs.dump($r.header)"),
       nxt_string("{type:\"object\",props:[\"getter\",\"foreach\",\"next\"]}") },
+
+    /* Built-in methods name. */
+
+    { nxt_string(
+        "var fail;"
+        "function isMethodsHaveName(o) {"
+        "    var except = ["
+        "        'prototype',"
+        "        'constructor',"
+        "    ];"
+        "    return Object.getOwnPropertyNames(o)"
+        "                 .filter(v => !except.includes(v)"
+        "                              && typeof o[v] == 'function')"
+        "                 .every(v => o[v].name == v"
+        "                             || !(fail = `${o.name}.${v}: ${o[v].name}`));"
+        "}"
+        "["
+        "    Boolean, Boolean.prototype,"
+        "    Number, Number.prototype,"
+        "    String, String.prototype,"
+        "    Object, Object.prototype,"
+        "    Array, Array.prototype,"
+        "    Function, Function.prototype,"
+        "    RegExp, RegExp.prototype,"
+        "    Date, Date.prototype,"
+        "    Error, Error.prototype,"
+        "    Math,"
+        "    JSON,"
+        "].every(obj => isMethodsHaveName(obj)) || fail"),
+
+      nxt_string("true") },
 
     /* require(). */
 
