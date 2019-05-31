@@ -922,12 +922,43 @@ static njs_ret_t
 ngx_http_js_ext_get_header_out(njs_vm_t *vm, njs_value_t *value, void *obj,
     uintptr_t data)
 {
+    u_char              *p, *start;
     nxt_str_t           *v;
+    ngx_str_t           *hdr;
     ngx_table_elt_t     *h;
     ngx_http_request_t  *r;
+    u_char               content_len[NGX_OFF_T_LEN];
 
     r = (ngx_http_request_t *) obj;
     v = (nxt_str_t *) data;
+
+    if (v->length == nxt_length("Content-Type")
+        && ngx_strncasecmp(v->start, (u_char *) "Content-Type",
+                           v->length) == 0)
+    {
+        hdr = &r->headers_out.content_type;
+        return njs_vm_value_string_set(vm, value, hdr->data, hdr->len);
+    }
+
+    if (v->length == nxt_length("Content-Length")
+        && ngx_strncasecmp(v->start, (u_char *) "Content-Length",
+                           v->length) == 0)
+    {
+        if (r->headers_out.content_length == NULL
+            && r->headers_out.content_length_n >= 0)
+        {
+            p = ngx_sprintf(content_len, "%O", r->headers_out.content_length_n);
+
+            start = njs_vm_value_string_alloc(vm, value, p - content_len);
+            if (start == NULL) {
+                return NJS_ERROR;
+            }
+
+            ngx_memcpy(start, content_len, p - content_len);
+
+            return NJS_OK;
+        }
+    }
 
     h = ngx_http_js_get_header(&r->headers_out.headers.part, v->start,
                                v->length);
@@ -1697,7 +1728,7 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
 {
     ngx_int_t                 rc;
     nxt_str_t                 uri_arg, args_arg, method_name, body_arg;
-    ngx_uint_t                method, n, has_body;
+    ngx_uint_t                method, methods_max, has_body;
     njs_value_t              *value;
     njs_function_t           *callback;
     ngx_http_js_ctx_t        *ctx;
@@ -1757,6 +1788,8 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
     callback = NULL;
 
     method = 0;
+    methods_max = sizeof(methods) / sizeof(methods[0]);
+
     args_arg.length = 0;
     args_arg.start = NULL;
     has_body = 0;
@@ -1796,9 +1829,7 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
                 return NJS_ERROR;
             }
 
-            n = sizeof(methods) / sizeof(methods[0]);
-
-            while (method < n) {
+            while (method < methods_max) {
                 if (method_name.length == methods[method].name.len
                     && ngx_memcmp(method_name.start, methods[method].name.data,
                                   method_name.length)
@@ -1808,11 +1839,6 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
                 }
 
                 method++;
-            }
-
-            if (method == n) {
-                njs_vm_error(vm, "unknown method \"%V\"", &method_name);
-                return NJS_ERROR;
             }
         }
 
@@ -1844,8 +1870,16 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, nxt_uint_t nargs,
         return NJS_ERROR;
     }
 
-    sr->method = methods[method].value;
-    sr->method_name = methods[method].name;
+    if (method != methods_max) {
+        sr->method = methods[method].value;
+        sr->method_name = methods[method].name;
+
+    } else {
+        sr->method = NGX_HTTP_UNKNOWN;
+        sr->method_name.len = method_name.length;
+        sr->method_name.data = method_name.start;
+    }
+
     sr->header_only = (sr->method == NGX_HTTP_HEAD) || (callback == NULL);
 
     if (has_body) {

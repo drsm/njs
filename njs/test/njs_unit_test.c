@@ -3995,6 +3995,20 @@ static njs_unit_test_t  njs_test[] =
                                  "{ return a + (x === undefined); }, 0)"),
       nxt_string("3") },
 
+    { nxt_string("var a = Array.prototype.fill.apply("
+                 "Object({length: 40}), [\"a\", 1, 20]); Object.values(a)"),
+      nxt_string("a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,40,a,a,a,a") },
+
+    { nxt_string("var a = Array.prototype.fill.apply({length: "
+                 "{ valueOf: function() { return 40 }}}, [\"a\", 1, 20]);"
+                 "Object.values(a)"),
+      nxt_string("a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,[object Object],a,a,a,a") },
+
+    { nxt_string("[NaN, false, ''].map("
+                 "(x) => Array.prototype.fill.call(x)"
+                 ").every((x) => typeof x == 'object')"),
+      nxt_string("true") },
+
     { nxt_string("var a = [];"
                  "a.filter(function(v, i, a) { return v > 1 })"),
       nxt_string("") },
@@ -4434,15 +4448,25 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("1") },
 
     { nxt_string("'\\ud83d abc \\udc4d'"),
-      nxt_string("SyntaxError: Invalid surrogate pair "
-                 "\"\\ud83d abc \\udc4d\" in 1") },
+      nxt_string("� abc �") },
 
     { nxt_string("'\\ud83d'"),
-      nxt_string("SyntaxError: Invalid surrogate pair \"\\ud83d\" in 1") },
+      nxt_string("�") },
 
     { nxt_string("'\\ud83d\\uabcd'"),
-      nxt_string("SyntaxError: Invalid surrogate pair "
-                 "\"\\ud83d\\uabcd\" in 1") },
+      nxt_string("�ꯍ") },
+
+    { nxt_string("'\\u{d800}\\u{dB00}'"),
+      nxt_string("��") },
+
+    { nxt_string("'\\u{d800}\\u{d7ff}'"),
+      nxt_string("�퟿") },
+
+    { nxt_string("'\\u{d800}['"),
+      nxt_string("�[") },
+
+    { nxt_string("'\\u{D800}\\u{'"),
+      nxt_string("SyntaxError: Invalid Unicode code point \"\\u{D800}\\u{\" in 1") },
 
     { nxt_string("''.hasOwnProperty('length')"),
       nxt_string("true") },
@@ -4619,6 +4643,18 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("'A'.repeat(16).toBytes() === 'A'.repeat(16)"),
       nxt_string("true") },
+
+    { nxt_string("'A'.repeat(38).toBytes(-5) === 'AAAAA'"),
+      nxt_string("true") },
+
+    { nxt_string("('α' + 'A'.repeat(32)).toBytes()"),
+      nxt_string("null") },
+
+    { nxt_string("('α' + 'A'.repeat(32)).toBytes(1) === 'A'.repeat(32)"),
+      nxt_string("true") },
+
+    { nxt_string("('α' + 'A'.repeat(40)).toBytes(-3,-1)"),
+      nxt_string("AA") },
 
     { nxt_string("var s = 'x'.repeat(2**10).repeat(2**14);"
                  "var a = Array(200).fill(s);"
@@ -5253,8 +5289,8 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("'абв абв абвгдежз'.endsWith('абвгд', 14)"),
       nxt_string("false") },
 
-    { nxt_string("'ABC'.toLowerCase()"),
-      nxt_string("abc") },
+    { nxt_string("'\x00АБВГДЕЁЖЗ'.toLowerCase().length"),
+      nxt_string("10") },
 
     { nxt_string("'ΑΒΓ'.toLowerCase()"),
       nxt_string("αβγ") },
@@ -5268,8 +5304,8 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("'αβγ'.toUpperCase()"),
       nxt_string("ΑΒΓ") },
 
-    { nxt_string("'абв'.toUpperCase()"),
-      nxt_string("АБВ") },
+    { nxt_string("'\x00абвгдеёжз'.toUpperCase().length"),
+      nxt_string("10") },
 
     { nxt_string("var a = [], code;"
                  "for (code = 0; code <= 1114111; code++) {"
@@ -6084,6 +6120,12 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("function f(a,b) { }; var ff = f.bind(f, 1); ff.length"),
       nxt_string("1") },
+
+    { nxt_string("Object((new Date(0)).toJSON())+0"),
+      nxt_string("1970-01-01T00:00:00.000Z0") },
+
+    { nxt_string("Object((new Array(0)).toString())+0"),
+      nxt_string("0") },
 
     { nxt_string("JSON.parse.length"),
       nxt_string("2") },
@@ -11769,10 +11811,19 @@ static njs_unit_test_t  njs_test[] =
       nxt_string("SyntaxError: Unknown escape char at position 2") },
 
     { nxt_string("JSON.parse('\"\\\\uDC01\"')"),
-      nxt_string("SyntaxError: Invalid Unicode char at position 7") },
+      nxt_string("�") },
 
     { nxt_string("JSON.parse('\"\\\\uD801\\\\uE000\"')"),
-      nxt_string("SyntaxError: Invalid surrogate pair at position 13") },
+      nxt_string("�") },
+
+    { nxt_string("JSON.parse('\"\\\\uD83D\"')"),
+      nxt_string("�") },
+
+    { nxt_string("JSON.parse('\"\\\\uD800\\\\uDB00\"')"),
+      nxt_string("��") },
+
+    { nxt_string("JSON.parse('\"\\\\ud800[\"')"),
+      nxt_string("�[") },
 
     { nxt_string("JSON.parse('{')"),
       nxt_string("SyntaxError: Unexpected end of input at position 1") },
@@ -12743,6 +12794,9 @@ static njs_unit_test_t  njs_regexp_test[] =
 
     { nxt_string("RegExp('[\\\\u0430-\\\\u044f]+').exec('тест')[0]"),
       nxt_string("тест") },
+
+    { nxt_string("/[\\uFDE0-\\uFFFD]/g; export default 1"),
+      nxt_string("SyntaxError: Illegal export statement in 1") },
 };
 
 
