@@ -5540,7 +5540,19 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("/]/"),
       nxt_string("/\\]/") },
 
+    { nxt_string("RegExp(']')"),
+      nxt_string("/\\]/") },
+
+    { nxt_string("RegExp('[\\\\\\\\]]')"),
+      nxt_string("/[\\\\]\\]/") },
+
+    { nxt_string("/[\\\\]]/"),
+      nxt_string("/[\\\\]\\]/") },
+
     { nxt_string("/\\]/"),
+      nxt_string("/\\]/") },
+
+    { nxt_string("RegExp('\\]')"),
       nxt_string("/\\]/") },
 
     { nxt_string("/ab]cd/"),
@@ -5551,6 +5563,9 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("/]cd/"),
       nxt_string("/\\]cd/") },
+
+    { nxt_string("RegExp('\\\\0').source[1]"),
+      nxt_string("0") },
 
     { nxt_string("']'.match(/]/)"),
       nxt_string("]") },
@@ -7441,6 +7456,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("new RegExp('[')"),
       nxt_string("SyntaxError: pcre_compile(\"[\") failed: missing terminating ] for character class") },
 
+    { nxt_string("new RegExp('\\\\')"),
+      nxt_string("SyntaxError: pcre_compile(\"\\\") failed: \\ at end of pattern") },
+
     { nxt_string("[0].map(RegExp().toString)"),
       nxt_string("TypeError: \"this\" argument is not a regexp") },
 
@@ -9301,6 +9319,18 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("var o = {}; Object.defineProperty(o)"),
       nxt_string("TypeError: descriptor is not an object") },
+
+    { nxt_string("Object.defineProperty(Function.prototype, 'name', {value:'x'}).name"),
+      nxt_string("x") },
+
+    { nxt_string("Object.defineProperty(Function.prototype, 'xxx', {value:'x'}).xxx"),
+      nxt_string("x") },
+
+    { nxt_string("Object.defineProperty(Object, 'name', {value:'x'}).name"),
+      nxt_string("x") },
+
+    { nxt_string("Object.defineProperty(Object.prototype, 'toString', {value:1}).toString"),
+      nxt_string("1") },
 
     { nxt_string("var o = Object.defineProperties({}, {a:{value:1}}); o.a"),
       nxt_string("1") },
@@ -12797,6 +12827,27 @@ static njs_unit_test_t  njs_regexp_test[] =
 
     { nxt_string("/[\\uFDE0-\\uFFFD]/g; export default 1"),
       nxt_string("SyntaxError: Illegal export statement in 1") },
+
+    { nxt_string("RegExp(RegExp('\x00]]')).test('\x00]]')"),
+      nxt_string("true") },
+
+    { nxt_string("RegExp('\0').test('\0')"),
+      nxt_string("true") },
+
+    { nxt_string("RegExp('\x00').test('\0')"),
+      nxt_string("true") },
+
+    { nxt_string("RegExp('\x00\\\\x00').source"),
+      nxt_string("\\u0000\\x00") },
+
+    { nxt_string("/\\\0/"),
+      nxt_string("/\\\\u0000/") },
+
+    { nxt_string("RegExp('\\\\\\0').source"),
+      nxt_string("\\\\u0000") },
+
+    { nxt_string("RegExp('[\0]').test('\0')"),
+      nxt_string("true") },
 };
 
 
