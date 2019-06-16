@@ -876,8 +876,9 @@ njs_json_parse_number(njs_json_parse_ctx_t *ctx, njs_value_t *value,
     start = p;
     num = njs_number_dec_parse(&p, ctx->end);
     if (p != start) {
-        *value = njs_value_zero;
         value->data.u.number = sign * num;
+        value->type = NJS_NUMBER;
+        value->data.truth = njs_is_number_true(num);
 
         return p;
     }
@@ -2353,6 +2354,7 @@ njs_vm_value_dump(njs_vm_t *vm, nxt_str_t *retval, const njs_value_t *value,
     njs_ret_t             ret;
     nxt_str_t             str;
     njs_value_t           *key, *val, ext_val;
+    njs_object_t          *object;
     njs_json_state_t      *state;
     njs_object_prop_t     *prop;
     nxt_lvlhsh_query_t    lhq;
@@ -2445,11 +2447,15 @@ njs_vm_value_dump(njs_vm_t *vm, nxt_str_t *retval, const njs_value_t *value,
                 val = &ext_val;
 
             } else {
+                object = state->value.data.u.object;
                 lhq.proto = &njs_object_hash_proto;
 
-                ret = nxt_lvlhsh_find(&state->value.data.u.object->hash, &lhq);
-                if (nxt_slow_path(ret == NXT_DECLINED)) {
-                    break;
+                ret = nxt_lvlhsh_find(&object->hash, &lhq);
+                if (ret == NXT_DECLINED) {
+                    ret = nxt_lvlhsh_find(&object->shared_hash, &lhq);
+                    if (nxt_slow_path(ret == NXT_DECLINED)) {
+                        break;
+                    }
                 }
 
                 prop = lhq.value;
