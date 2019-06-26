@@ -11744,6 +11744,9 @@ static njs_unit_test_t  njs_test[] =
     { nxt_string("parseInt('0', 37)"),
       nxt_string("NaN") },
 
+    { nxt_string("1/parseInt('-0')"),
+      nxt_string("-Infinity") },
+
     { nxt_string("parseFloat.name"),
       nxt_string("parseFloat") },
 
@@ -12466,6 +12469,15 @@ static njs_unit_test_t  njs_test[] =
 
     { nxt_string("njs.dump(njs) == `{version:'${njs.version}'}`"),
       nxt_string("true") },
+
+    { nxt_string("njs.dump(-0)"),
+      nxt_string("-0") },
+
+    { nxt_string("njs.dump(Object(-0))"),
+      nxt_string("[Number: -0]") },
+
+    { nxt_string("njs.dump([0, -0])"),
+      nxt_string("[0,-0]") },
 
     /* Built-in methods name. */
 
